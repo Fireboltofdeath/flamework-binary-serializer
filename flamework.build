@@ -1,0 +1,7 @@
+{
+	"version": 1,
+	"flameworkVersion": "1.1.1",
+	"identifiers": {},
+	"metadata": {},
+	"identifierPrefix": "@rbxts/flamework-binary-serializer"
+}

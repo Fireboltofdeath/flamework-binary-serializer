@@ -1,0 +1,38 @@
+{
+	"name": "@rbxts/flamework-binary-serializer",
+	"version": "0.0.0",
+	"description": "",
+	"main": "out/init.lua",
+	"scripts": {
+		"build": "rbxtsc",
+		"watch": "rbxtsc -w",
+		"prepublishOnly": "npm run build"
+	},
+	"keywords": [],
+	"author": "",
+	"license": "ISC",
+	"types": "out/index.d.ts",
+	"files": [
+		"out",
+		"flamework.build",
+		"!**/*.tsbuildinfo"
+	],
+	"publishConfig": {
+		"access": "public"
+	},
+	"devDependencies": {
+		"@flamework/core": "^1.1.1",
+		"@rbxts/compiler-types": "^2.3.0-types.0",
+		"@rbxts/types": "^1.0.754",
+		"@typescript-eslint/eslint-plugin": "^7.0.1",
+		"@typescript-eslint/parser": "^7.0.1",
+		"eslint": "^8.56.0",
+		"eslint-config-prettier": "^8.3.0",
+		"eslint-plugin-prettier": "^3.4.0",
+		"eslint-plugin-roblox-ts": "^0.0.36",
+		"prettier": "^2.3.2",
+		"rbxts-transformer-flamework": "^1.1.1",
+		"roblox-ts": "^2.3.0",
+		"typescript": "^5.2.2"
+	}
+}

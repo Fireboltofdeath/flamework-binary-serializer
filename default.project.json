@@ -1,0 +1,13 @@
+{
+	"name": "flamework-binary-serializer",
+	"globIgnorePaths": [
+		"**/package.json",
+		"**/tsconfig.json"
+	],
+	"tree": {
+		"$className": "Folder",
+		"out": {
+			"$path": "out"
+		}
+	}
+}
