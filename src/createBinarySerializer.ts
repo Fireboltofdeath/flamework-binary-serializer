@@ -34,6 +34,8 @@ export type SerializerMetadata<T> = undefined extends T
 	? ["i16"]
 	: IsNumber<T, "i32"> extends true
 	? ["i32"]
+	: [T] extends [boolean]
+	? ["boolean"]
 	: [T] extends [number]
 	? ["f64"]
 	: [T] extends [string]
@@ -70,6 +72,7 @@ type SerializerData =
 	| ["i8"]
 	| ["i16"]
 	| ["i32"]
+	| ["boolean"]
 	| ["string"]
 	| ["object", Array<string | SerializerData>, object]
 	| ["object_raw", [string, SerializerData][]]
@@ -151,6 +154,9 @@ function createSerializer(meta: SerializerData) {
 		} else if (kind === "i32") {
 			allocate(4);
 			buffer.writei32(buf, currentOffset, value as number);
+		} else if (kind === "boolean") {
+			allocate(1);
+			buffer.writeu8(buf, currentOffset, value === true ? 1 : 0);
 		} else if (kind === "string") {
 			const size = (value as string).size();
 			allocate(4 + size);
@@ -197,6 +203,8 @@ function createSerializer(meta: SerializerData) {
 		} else if (kind === "blob") {
 			// Value will always be defined because if it isn't, it will be wrapped in `optional`
 			blobs.push(value!);
+		} else {
+			error(`unexpected kind: ${kind}`);
 		}
 	}
 
@@ -250,6 +258,9 @@ function createDeserializer<T>(meta: SerializerData) {
 		} else if (kind === "i32") {
 			offset += 4;
 			return buffer.readi32(buf, currentOffset);
+		} else if (kind === "boolean") {
+			offset += 1;
+			return buffer.readu8(buf, currentOffset) === 1;
 		} else if (kind === "string") {
 			const length = buffer.readu32(buf, currentOffset);
 			offset += 4 + length;
@@ -290,6 +301,8 @@ function createDeserializer<T>(meta: SerializerData) {
 		} else if (kind === "blob") {
 			blobIndex++;
 			return blobs![blobIndex - 1];
+		} else {
+			error(`unexpected kind: ${kind}`);
 		}
 	}
 
