@@ -1,7 +1,7 @@
 # flamework-binary-serializer
 This is a small and simple library that allows you to specify a small and optimized structure for binary data.
 
-This package is **not** an unofficial Flamework package, but it does use Flamework to automatically generate a description given any arbitrary TS type.
+This package is **not** an official Flamework package, but it does use Flamework to automatically generate a description given any arbitrary TS type.
 You should refer to the [Flamework documentation](https://flamework.fireboltofdeath.dev/) for installation steps.
 
 ## Demo
