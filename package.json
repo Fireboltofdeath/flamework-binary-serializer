@@ -2,24 +2,29 @@
 	"name": "@rbxts/flamework-binary-serializer",
 	"version": "0.1.0",
 	"description": "",
+	"author": "Fireboltofdeath",
 	"main": "out/init.lua",
-	"scripts": {
-		"build": "rbxtsc",
-		"watch": "rbxtsc -w",
-		"prepublishOnly": "npm run build"
-	},
+	"homepage": "https://github.com/Fireboltofdeath/flamework-binary-serializer",
 	"keywords": [],
-	"author": "",
 	"license": "ISC",
-	"types": "out/index.d.ts",
+	"repository": {
+	  "type": "git",
+	  "url": "git+https://github.com/Fireboltofdeath/flamework-binary-serializer.git"
+	},
+	"publishConfig": {
+		"access": "public"
+	},
 	"files": [
 		"out",
 		"flamework.build",
 		"!**/*.tsbuildinfo"
 	],
-	"publishConfig": {
-		"access": "public"
+	"scripts": {
+		"build": "rbxtsc",
+		"watch": "rbxtsc -w",
+		"prepublishOnly": "npm run build"
 	},
+	"types": "out/index.d.ts",
 	"devDependencies": {
 		"@flamework/core": "^1.1.1",
 		"@rbxts/compiler-types": "^2.3.0-types.0",
