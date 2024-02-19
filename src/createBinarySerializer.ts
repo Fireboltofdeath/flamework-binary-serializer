@@ -2,6 +2,12 @@
 import { Modding } from "@flamework/core";
 import { FindDiscriminator, IsDiscriminableUnion } from "./discriminators";
 
+type IsNumber<T, K extends string> = `_${K}` extends keyof T ? true : false;
+type HasNominal<T> = T extends T ? (T extends `_nominal_${string}` ? true : never) : never;
+
+/**
+ * This namespace includes additional types that can be used in the binary serializer.
+ */
 export namespace DataType {
 	export type f32 = number & { _f32?: never };
 	export type f64 = number & { _f64?: never };
@@ -15,7 +21,31 @@ export namespace DataType {
 	export type i32 = number & { _i32?: never };
 }
 
-type IsNumber<T, K extends string> = `_${K}` extends keyof T ? true : false;
+/**
+ * A binary serializer.
+ */
+export interface Serializer<T> {
+	/**
+	 * Serializes the input into a buffer.
+	 *
+	 * Result includes a blobs array which is used for things that cannot be put into the buffer.
+	 * The blobs array can be sent across the network or otherwise stored and passed into the deserialize function.
+	 */
+	serialize: (value: T) => { buffer: buffer; blobs: defined[] };
+
+	/**
+	 * Deserializes the input back into `T`.
+	 *
+	 * The blobs array can be omitted, but if the buffer contains blob references then deserialization will error.
+	 */
+	deserialize: (input: buffer, inputBlobs?: defined[]) => T;
+}
+
+/**
+ * This is the metadata expected by the `createSerializer` function.
+ *
+ * This can be used in your own user macros to generate serializers for arbitrary types, such as for a networking library.
+ */
 export type SerializerMetadata<T> = undefined extends T
 	? ["optional", SerializerMetadata<NonNullable<T>>]
 	: IsNumber<T, "f64"> extends true
@@ -61,8 +91,6 @@ export type SerializerMetadata<T> = undefined extends T
 	  ]
 	: ["blob"];
 
-type HasNominal<T> = T extends T ? (T extends `_nominal_${string}` ? true : never) : never;
-
 type SerializerData =
 	| ["f32"]
 	| ["f64"]
@@ -106,7 +134,7 @@ function optimizeSerializerData(data: SerializerData): SerializerData {
 	return data;
 }
 
-function createSerializer(meta: SerializerData) {
+function createSerializer<T>(meta: SerializerData) {
 	let currentSize = 2 ** 8;
 	let buf = buffer.create(currentSize);
 	let offset!: number;
@@ -208,7 +236,7 @@ function createSerializer(meta: SerializerData) {
 		}
 	}
 
-	return (value: unknown) => {
+	return (value: T) => {
 		offset = 0;
 		blobs = [];
 		serialize(value, meta);
@@ -316,9 +344,9 @@ function createDeserializer<T>(meta: SerializerData) {
 }
 
 /** @metadata macro */
-export function createBinarySerializer<T>(meta?: Modding.Many<SerializerMetadata<T>>) {
+export function createBinarySerializer<T>(meta?: Modding.Many<SerializerMetadata<T>>): Serializer<T> {
 	return {
 		serialize: createSerializer(meta as never),
-		deserialize: createDeserializer<T>(meta as never),
+		deserialize: createDeserializer(meta as never),
 	};
 }
