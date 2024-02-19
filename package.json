@@ -1,6 +1,6 @@
 {
 	"name": "@rbxts/flamework-binary-serializer",
-	"version": "0.1.0",
+	"version": "0.1.1",
 	"description": "",
 	"author": "Fireboltofdeath",
 	"main": "out/init.lua",
@@ -8,8 +8,8 @@
 	"keywords": [],
 	"license": "ISC",
 	"repository": {
-	  "type": "git",
-	  "url": "git+https://github.com/Fireboltofdeath/flamework-binary-serializer.git"
+		"type": "git",
+		"url": "git+https://github.com/Fireboltofdeath/flamework-binary-serializer.git"
 	},
 	"publishConfig": {
 		"access": "public"
