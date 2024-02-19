@@ -1,1 +1,1 @@
-export { createBinarySerializer, DataType } from "./createBinarySerializer";
+export { createBinarySerializer, DataType, Serializer, SerializerMetadata } from "./createBinarySerializer";
