@@ -70,6 +70,8 @@ export type SerializerMetadata<T> = undefined extends T
 	? ["f64"]
 	: [T] extends [string]
 	? ["string"]
+	: [T] extends [Vector3]
+	? ["vector"]
 	: [T] extends [(infer V)[]]
 	? ["array", SerializerMetadata<V>]
 	: [T] extends [ReadonlyMap<infer K, infer V>]
@@ -106,6 +108,7 @@ type SerializerData =
 	| ["i32"]
 	| ["boolean"]
 	| ["string"]
+	| ["vector"]
 	| ["object", Array<string | SerializerData>, object]
 	| ["object_raw", [string, SerializerData][]]
 	| ["union", string, [unknown, SerializerData][]]
@@ -198,6 +201,11 @@ function createSerializer<T>(meta: SerializerData) {
 			allocate(4 + size);
 			buffer.writeu32(buf, currentOffset, size);
 			buffer.writestring(buf, currentOffset + 4, value as string);
+		} else if (kind === "vector") {
+			allocate(12);
+			buffer.writef32(buf, currentOffset, (value as Vector3).X);
+			buffer.writef32(buf, currentOffset + 4, (value as Vector3).Y);
+			buffer.writef32(buf, currentOffset + 8, (value as Vector3).Z);
 		} else if (kind === "object") {
 			const elements = meta[1];
 			for (const i of $range(1, elements.size(), 2)) {
@@ -334,6 +342,14 @@ function createDeserializer<T>(meta: SerializerData) {
 			offset += 4 + length;
 
 			return buffer.readstring(buf, currentOffset + 4, length);
+		} else if (kind === "vector") {
+			offset += 12;
+
+			return new Vector3(
+				buffer.readf32(buf, currentOffset),
+				buffer.readf32(buf, currentOffset + 4),
+				buffer.readf32(buf, currentOffset + 8),
+			);
 		} else if (kind === "object") {
 			const elements = meta[1];
 			const obj = table.clone(meta[2]) as Map<unknown, unknown>;
