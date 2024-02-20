@@ -25,6 +25,10 @@
 		"prepublishOnly": "npm run build"
 	},
 	"types": "out/index.d.ts",
+	"peerDependencies": {
+		"@flamework/core": "*",
+		"rbxts-transformer-flamework": "*"
+	},
 	"devDependencies": {
 		"@flamework/core": "^1.1.1",
 		"@rbxts/compiler-types": "^2.3.0-types.0",
