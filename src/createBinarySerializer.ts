@@ -206,10 +206,15 @@ function createSerializer<T>(meta: SerializerData) {
 		} else if (kind === "array") {
 			const serializer = meta[1];
 			allocate(4);
-			buffer.writeu32(buf, currentOffset, (value as unknown[]).size());
+
+			let size = 0;
 			for (const element of value as unknown[]) {
+				size += 1;
 				serialize(element, serializer);
 			}
+
+			// We already allocated this space before serializing the array, so this is safe.
+			buffer.writeu32(buf, currentOffset, size);
 		} else if (kind === "map") {
 			const keySerializer = meta[1];
 			const valueSerializer = meta[2];
