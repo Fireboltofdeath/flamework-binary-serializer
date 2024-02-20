@@ -72,6 +72,8 @@ export type SerializerMetadata<T> = undefined extends T
 	? ["string"]
 	: [T] extends [(infer V)[]]
 	? ["array", SerializerMetadata<V>]
+	: [T] extends [ReadonlyMap<infer K, infer V>]
+	? ["map", SerializerMetadata<K>, SerializerMetadata<V>]
 	: IsDiscriminableUnion<T> extends true
 	? [
 			"union",
@@ -106,6 +108,7 @@ type SerializerData =
 	| ["object_raw", [string, SerializerData][]]
 	| ["union", string, [unknown, SerializerData][]]
 	| ["array", SerializerData]
+	| ["map", SerializerData, SerializerData]
 	| ["optional", SerializerData]
 	| ["blob"];
 
@@ -129,6 +132,8 @@ function optimizeSerializerData(data: SerializerData): SerializerData {
 			data[1],
 			data[2].map(([key, data]): [unknown, SerializerData] => [key, optimizeSerializerData(data)]),
 		];
+	} else if (data[0] === "map") {
+		data = [data[0], optimizeSerializerData(data[1]), optimizeSerializerData(data[2])];
 	}
 
 	return data;
@@ -202,6 +207,20 @@ function createSerializer<T>(meta: SerializerData) {
 			for (const element of value as unknown[]) {
 				serialize(element, serializer);
 			}
+		} else if (kind === "map") {
+			const keySerializer = meta[1];
+			const valueSerializer = meta[2];
+			allocate(4);
+
+			let size = 0;
+			for (const [elementIndex, elementValue] of value as Map<unknown, unknown>) {
+				size += 1;
+				serialize(elementIndex, keySerializer);
+				serialize(elementValue, valueSerializer);
+			}
+
+			// We already allocated this space before serializing the map, so this is safe.
+			buffer.writeu32(buf, currentOffset, size);
 		} else if (kind === "optional") {
 			allocate(1);
 			if (value !== undefined) {
@@ -314,6 +333,18 @@ function createDeserializer<T>(meta: SerializerData) {
 			}
 
 			return array;
+		} else if (kind === "map") {
+			const keyDeserializer = meta[1];
+			const valueDeserializer = meta[2];
+			const length = buffer.readu32(buf, currentOffset);
+			const map = new Map<unknown, unknown>();
+			offset += 4;
+
+			for (const i of $range(1, length)) {
+				map.set(deserialize(keyDeserializer), deserialize(valueDeserializer));
+			}
+
+			return map;
 		} else if (kind === "optional") {
 			offset += 1;
 			return buffer.readu8(buf, currentOffset) === 1 ? deserialize(meta[1]) : undefined;
