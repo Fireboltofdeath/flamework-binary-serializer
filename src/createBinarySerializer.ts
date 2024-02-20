@@ -74,6 +74,8 @@ export type SerializerMetadata<T> = undefined extends T
 	? ["array", SerializerMetadata<V>]
 	: [T] extends [ReadonlyMap<infer K, infer V>]
 	? ["map", SerializerMetadata<K>, SerializerMetadata<V>]
+	: [T] extends [ReadonlySet<infer V>]
+	? ["set", SerializerMetadata<V>]
 	: IsDiscriminableUnion<T> extends true
 	? [
 			"union",
@@ -109,6 +111,7 @@ type SerializerData =
 	| ["union", string, [unknown, SerializerData][]]
 	| ["array", SerializerData]
 	| ["map", SerializerData, SerializerData]
+	| ["set", SerializerData]
 	| ["optional", SerializerData]
 	| ["blob"];
 
@@ -124,7 +127,7 @@ function optimizeSerializerData(data: SerializerData): SerializerData {
 			preallocation.add(key);
 		}
 		data = ["object", transformed, preallocation];
-	} else if (data[0] === "array" || data[0] === "optional") {
+	} else if (data[0] === "array" || data[0] === "optional" || data[0] === "set") {
 		data = [data[0], optimizeSerializerData(data[1])];
 	} else if (data[0] === "union") {
 		data = [
@@ -220,6 +223,19 @@ function createSerializer<T>(meta: SerializerData) {
 			}
 
 			// We already allocated this space before serializing the map, so this is safe.
+			buffer.writeu32(buf, currentOffset, size);
+		} else if (kind === "set") {
+			// We could just generate `Map<V, true>` for sets, but this is more efficient as it omits serializing a boolean per value.
+			const valueSerializer = meta[1];
+			allocate(4);
+
+			let size = 0;
+			for (const elementValue of value as Set<unknown>) {
+				size += 1;
+				serialize(elementValue, valueSerializer);
+			}
+
+			// We already allocated this space before serializing the set, so this is safe.
 			buffer.writeu32(buf, currentOffset, size);
 		} else if (kind === "optional") {
 			allocate(1);
@@ -345,6 +361,17 @@ function createDeserializer<T>(meta: SerializerData) {
 			}
 
 			return map;
+		} else if (kind === "set") {
+			const valueDeserializer = meta[1];
+			const length = buffer.readu32(buf, currentOffset);
+			const set = new Set<unknown>();
+			offset += 4;
+
+			for (const i of $range(1, length)) {
+				set.add(deserialize(valueDeserializer));
+			}
+
+			return set;
 		} else if (kind === "optional") {
 			offset += 1;
 			return buffer.readu8(buf, currentOffset) === 1 ? deserialize(meta[1]) : undefined;
