@@ -230,14 +230,11 @@ function createSerializer<T>(meta: SerializerData) {
 			const serializer = meta[1];
 			allocate(4);
 
-			let size = 0;
+			buffer.writeu32(buf, currentOffset, (value as unknown[]).size());
+
 			for (const element of value as unknown[]) {
-				size += 1;
 				serialize(element, serializer);
 			}
-
-			// We already allocated this space before serializing the array, so this is safe.
-			buffer.writeu32(buf, currentOffset, size);
 		} else if (kind === "tuple") {
 			const elements = meta[1];
 			const restSerializer = meta[2];
