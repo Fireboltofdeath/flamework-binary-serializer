@@ -1,6 +1,7 @@
 //!optimize 2
 import { Modding } from "@flamework/core";
 import { FindDiscriminator, IsDiscriminableUnion } from "./discriminators";
+import { HasRest, RestType, SplitRest } from "./tuples";
 
 type IsNumber<T, K extends string> = `_${K}` extends keyof T ? true : false;
 type HasNominal<T> = T extends T ? (T extends `_nominal_${string}` ? true : never) : never;
@@ -42,6 +43,17 @@ export interface Serializer<T> {
 }
 
 /**
+ * Generates the metadata for arrays and tuples.
+ */
+type ArrayMetadata<T extends unknown[]> = [T] extends [{ length: number }]
+	? [
+			"tuple",
+			SplitRest<T> extends infer A ? { [k in keyof A]: SerializerMetadata<A[k]> } : never,
+			HasRest<T> extends true ? SerializerMetadata<RestType<T>> : undefined,
+	  ]
+	: ["array", SerializerMetadata<T[number]>];
+
+/**
  * This is the metadata expected by the `createSerializer` function.
  *
  * This can be used in your own user macros to generate serializers for arbitrary types, such as for a networking library.
@@ -72,8 +84,8 @@ export type SerializerMetadata<T> = undefined extends T
 	? ["string"]
 	: [T] extends [Vector3]
 	? ["vector"]
-	: [T] extends [(infer V)[]]
-	? ["array", SerializerMetadata<V>]
+	: [T] extends [unknown[]]
+	? ArrayMetadata<T>
 	: [T] extends [ReadonlyMap<infer K, infer V>]
 	? ["map", SerializerMetadata<K>, SerializerMetadata<V>]
 	: [T] extends [ReadonlySet<infer V>]
@@ -113,6 +125,7 @@ type SerializerData =
 	| ["object_raw", [string, SerializerData][]]
 	| ["union", string, [unknown, SerializerData][]]
 	| ["array", SerializerData]
+	| ["tuple", SerializerData[], SerializerData | undefined]
 	| ["map", SerializerData, SerializerData]
 	| ["set", SerializerData]
 	| ["optional", SerializerData]
@@ -140,6 +153,8 @@ function optimizeSerializerData(data: SerializerData): SerializerData {
 		];
 	} else if (data[0] === "map") {
 		data = [data[0], optimizeSerializerData(data[1]), optimizeSerializerData(data[2])];
+	} else if (data[0] === "tuple") {
+		data = [data[0], data[1].map(optimizeSerializerData), data[2] ? optimizeSerializerData(data[2]) : undefined];
 	}
 
 	return data;
@@ -223,6 +238,23 @@ function createSerializer<T>(meta: SerializerData) {
 
 			// We already allocated this space before serializing the array, so this is safe.
 			buffer.writeu32(buf, currentOffset, size);
+		} else if (kind === "tuple") {
+			const elements = meta[1];
+			const restSerializer = meta[2];
+			const size = (value as unknown[]).size();
+
+			// We serialize the rest element length first so that the deserializer can allocate accordingly.
+			if (restSerializer) {
+				allocate(4);
+				buffer.writeu32(buf, currentOffset, size - elements.size());
+			}
+
+			for (const i of $range(1, size)) {
+				const serializer = elements[i - 1] ?? restSerializer;
+				if (serializer) {
+					serialize((value as unknown[])[i - 1], serializer);
+				}
+			}
 		} else if (kind === "map") {
 			const keySerializer = meta[1];
 			const valueSerializer = meta[2];
@@ -370,6 +402,29 @@ function createDeserializer<T>(meta: SerializerData) {
 			}
 
 			return array;
+		} else if (kind === "tuple") {
+			const elements = meta[1];
+			const restDeserializer = meta[2];
+
+			let restLength = 0;
+			if (restDeserializer) {
+				offset += 4;
+				restLength = buffer.readu32(buf, currentOffset);
+			}
+
+			const tuple = new Array<defined>(elements.size() + restLength);
+
+			for (const element of elements) {
+				tuple.push(deserialize(element) as defined);
+			}
+
+			if (restDeserializer) {
+				for (const _ of $range(1, restLength)) {
+					tuple.push(deserialize(restDeserializer) as defined);
+				}
+			}
+
+			return tuple;
 		} else if (kind === "map") {
 			const keyDeserializer = meta[1];
 			const valueDeserializer = meta[2];
