@@ -60,6 +60,8 @@ type ArrayMetadata<T extends unknown[]> = [T] extends [{ length: number }]
  */
 export type SerializerMetadata<T> = IsLiteralUnion<T> extends true
 	? ["literal", NonNullable<T>[]]
+	: unknown extends T
+	? ["optional", ["blob"]]
 	: undefined extends T
 	? ["optional", SerializerMetadata<NonNullable<T>>]
 	: IsNumber<T, "f64"> extends true
