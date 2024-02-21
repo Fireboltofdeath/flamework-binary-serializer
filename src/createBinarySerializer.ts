@@ -1,6 +1,6 @@
 //!optimize 2
 import { Modding } from "@flamework/core";
-import { FindDiscriminator, IsDiscriminableUnion, IsLiteralUnion } from "./discriminators";
+import { FindDiscriminator, IsDiscriminableUnion, IsLiteralUnion } from "./unions";
 import { HasRest, RestType, SplitRest } from "./tuples";
 
 type IsNumber<T, K extends string> = `_${K}` extends keyof T ? true : false;
