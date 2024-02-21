@@ -1,6 +1,6 @@
 //!optimize 2
 import { Modding } from "@flamework/core";
-import { FindDiscriminator, IsDiscriminableUnion } from "./discriminators";
+import { FindDiscriminator, IsDiscriminableUnion, IsLiteralUnion } from "./discriminators";
 import { HasRest, RestType, SplitRest } from "./tuples";
 
 type IsNumber<T, K extends string> = `_${K}` extends keyof T ? true : false;
@@ -58,7 +58,9 @@ type ArrayMetadata<T extends unknown[]> = [T] extends [{ length: number }]
  *
  * This can be used in your own user macros to generate serializers for arbitrary types, such as for a networking library.
  */
-export type SerializerMetadata<T> = undefined extends T
+export type SerializerMetadata<T> = IsLiteralUnion<T> extends true
+	? ["literal", NonNullable<T>[]]
+	: undefined extends T
 	? ["optional", SerializerMetadata<NonNullable<T>>]
 	: IsNumber<T, "f64"> extends true
 	? ["f64"]
@@ -129,6 +131,7 @@ type SerializerData =
 	| ["map", SerializerData, SerializerData]
 	| ["set", SerializerData]
 	| ["optional", SerializerData]
+	| ["literal", defined[]]
 	| ["blob"];
 
 function optimizeSerializerData(data: SerializerData): SerializerData {
@@ -305,6 +308,14 @@ function createSerializer<T>(meta: SerializerData) {
 			buffer.writeu8(buf, currentOffset, tagIndex);
 
 			serialize(value, tagged[tagIndex][1]);
+		} else if (kind === "literal") {
+			const literals = meta[1];
+			const index = literals.indexOf(value as defined);
+			allocate(1);
+
+			// We support `undefined` as a literal, but `indexOf` will actually return -1
+			// This is fine, though, as -1 will serialize as 255 which is guarantee to be undefined with the 8 bit size limit.
+			buffer.writeu8(buf, currentOffset, index);
 		} else if (kind === "blob") {
 			// Value will always be defined because if it isn't, it will be wrapped in `optional`
 			blobs.push(value!);
@@ -457,6 +468,9 @@ function createDeserializer<T>(meta: SerializerData) {
 			(object as Record<string, unknown>)[meta[1]] = tag[0];
 
 			return object;
+		} else if (kind === "literal") {
+			offset += 1;
+			return meta[1][buffer.readu8(buf, currentOffset)];
 		} else if (kind === "blob") {
 			blobIndex++;
 			return blobs![blobIndex - 1];

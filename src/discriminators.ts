@@ -3,6 +3,20 @@ type FilterNever<T> = T extends T
 	? { [k in { [k in keyof T]: T[k] extends never ? never : k }[keyof T]]: T[k] }
 	: never;
 
+type IsLiteral<T> = T extends undefined
+	? true
+	: T extends string
+	? string extends T
+		? false
+		: true
+	: T extends number
+	? number extends T
+		? false
+		: true
+	: T extends boolean
+	? true
+	: false;
+
 export type FindDiscriminator<T> = keyof T &
 	keyof FilterNever<
 		T extends T ? { [k in keyof T]: T[k] extends string ? (string extends T[k] ? never : k) : never } : never
@@ -12,4 +26,13 @@ export type IsDiscriminableUnion<T> = true extends IsUnion<T>
 	? FindDiscriminator<T> extends never
 		? false
 		: true
+	: false;
+
+// This doesn't check whether T is a union, only that it is comprised of only literal values.
+// The distinction isn't very important for serialization purposes, as we can still optimize a single literal.
+// We also exclude plain `boolean` here as that has a more efficient special case.
+export type IsLiteralUnion<T> = [boolean, NonNullable<T>] extends [NonNullable<T>, boolean]
+	? false
+	: (T extends T ? (T extends undefined ? true : IsLiteral<T> extends true ? true : false) : never) extends true
+	? true
 	: false;
