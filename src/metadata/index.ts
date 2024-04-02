@@ -1,4 +1,4 @@
-import { FindDiscriminator, IsDiscriminableUnion, IsLiteralUnion } from "./unions";
+import { FindDiscriminator, IsDiscriminableUnion, IsLiteralUnion, type IsUnion } from "./unions";
 import { HasRest, RestType, SplitRest } from "./tuples";
 
 type IsNumber<T, K extends string> = `_${K}` extends keyof T ? true : false;
@@ -21,7 +21,7 @@ type ArrayMetadata<T extends unknown[]> = [T] extends [{ length: number }]
  * This can be used in your own user macros to generate serializers for arbitrary types, such as for a networking library.
  */
 export type SerializerMetadata<T> = IsLiteralUnion<T> extends true
-	? ["literal", NonNullable<T>[]]
+	? ["literal", NonNullable<T>[], true extends IsUnion<T> ? false : true]
 	: unknown extends T
 	? ["optional", ["blob"]]
 	: undefined extends T
@@ -101,5 +101,5 @@ export type SerializerData =
 	| ["map", SerializerData, SerializerData]
 	| ["set", SerializerData]
 	| ["optional", SerializerData]
-	| ["literal", defined[]]
+	| ["literal", defined[], boolean]
 	| ["blob"];
