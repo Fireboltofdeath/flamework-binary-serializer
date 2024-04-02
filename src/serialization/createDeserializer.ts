@@ -130,8 +130,14 @@ export function createDeserializer<T>(meta: SerializerData) {
 
 			return object;
 		} else if (kind === "literal") {
-			offset += 1;
-			return meta[1][buffer.readu8(buf, currentOffset)];
+			const literals = meta[1];
+			const isSingleLiteral = meta[2];
+			if (isSingleLiteral) {
+				return literals[0];
+			} else {
+				offset += 1;
+				return literals[buffer.readu8(buf, currentOffset)];
+			}
 		} else if (kind === "blob") {
 			blobIndex++;
 			return blobs![blobIndex - 1];
