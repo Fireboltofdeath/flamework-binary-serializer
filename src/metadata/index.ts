@@ -21,7 +21,7 @@ type ArrayMetadata<T extends unknown[]> = [T] extends [{ length: number }]
  * This can be used in your own user macros to generate serializers for arbitrary types, such as for a networking library.
  */
 export type SerializerMetadata<T> = IsLiteralUnion<T> extends true
-	? ["literal", NonNullable<T>[], true extends IsUnion<T> ? false : true]
+	? ["literal", NonNullable<T>[], true extends IsUnion<T> ? (undefined extends T ? 1 : 0) : -1]
 	: unknown extends T
 	? ["optional", ["blob"]]
 	: undefined extends T
@@ -103,5 +103,5 @@ export type SerializerData =
 	| ["map", SerializerData, SerializerData]
 	| ["set", SerializerData]
 	| ["optional", SerializerData]
-	| ["literal", defined[], boolean]
+	| ["literal", defined[], number]
 	| ["blob"];

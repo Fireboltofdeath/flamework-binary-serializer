@@ -132,12 +132,15 @@ export function createDeserializer<T>(meta: SerializerData) {
 			return object;
 		} else if (kind === "literal") {
 			const literals = meta[1];
-			const isSingleLiteral = meta[2];
-			if (isSingleLiteral) {
-				return literals[0];
-			} else {
+			const byteSize = meta[2];
+			if (byteSize === 1) {
 				offset += 1;
 				return literals[buffer.readu8(buf, currentOffset)];
+			} else if (byteSize === 2) {
+				offset += 2;
+				return literals[buffer.readu16(buf, currentOffset)];
+			} else {
+				return literals[0];
 			}
 		} else if (kind === "blob") {
 			blobIndex++;

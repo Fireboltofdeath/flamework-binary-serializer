@@ -153,15 +153,20 @@ export function createSerializer<T>(meta: SerializerData) {
 
 			serialize(value, tagMetadata);
 		} else if (kind === "literal") {
+			// We support `undefined` as a literal, but `indexOf` will actually return -1
+			// This is fine, though, as -1 will serialize as the max integer which will be undefined on unions that do not exceed the size limit.
 			const literals = meta[1];
-			const isSingleLiteral = meta[2];
-			if (!isSingleLiteral) {
+			const byteSize = meta[2];
+			if (byteSize === 1) {
 				const index = literals.indexOf(value as defined);
 				allocate(1);
 
-				// We support `undefined` as a literal, but `indexOf` will actually return -1
-				// This is fine, though, as -1 will serialize as 255 which is guarantee to be undefined with the 8 bit size limit.
 				buffer.writeu8(buf, currentOffset, index);
+			} else if (byteSize === 2) {
+				const index = literals.indexOf(value as defined);
+				allocate(2);
+
+				buffer.writeu16(buf, currentOffset, index);
 			}
 		} else if (kind === "blob") {
 			// Value will always be defined because if it isn't, it will be wrapped in `optional`

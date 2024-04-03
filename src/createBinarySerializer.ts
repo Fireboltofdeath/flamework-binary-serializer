@@ -68,6 +68,12 @@ function optimizeSerializerData(data: SerializerData): SerializerData {
 		data = [data[0], optimizeSerializerData(data[1]), optimizeSerializerData(data[2])];
 	} else if (data[0] === "tuple") {
 		data = [data[0], data[1].map(optimizeSerializerData), data[2] ? optimizeSerializerData(data[2]) : undefined];
+	} else if (data[0] === "literal") {
+		// Since `undefined` is not included in the size of `data[1]`,
+		// we add the existing value of `data[3]` (which is 1 if undefined is in the union) to `data[1]`
+		// to determine the final required size.
+		// A size of -1 means this isn't a union.
+		data = [data[0], data[1], data[2] === -1 ? 0 : data[2] + data[1].size() <= 256 ? 1 : 2];
 	}
 
 	return data;
