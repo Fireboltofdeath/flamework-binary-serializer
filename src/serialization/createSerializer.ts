@@ -128,23 +128,30 @@ export function createSerializer<T>(meta: SerializerData) {
 				buffer.writeu8(buf, currentOffset, 0);
 			}
 		} else if (kind === "union") {
-			allocate(1);
-
 			const tagName = meta[1];
 			const tagged = meta[2];
+			const byteSize = meta[3];
 			const objectTag = (value as Map<unknown, unknown>).get(tagName);
+			allocate(byteSize);
 
 			let tagIndex = 0;
+			let tagMetadata!: SerializerData;
 			for (const i of $range(1, tagged.size())) {
-				if (tagged[i - 1][0] === objectTag) {
+				const tagObject = tagged[i - 1];
+				if (tagObject[0] === objectTag) {
 					tagIndex = i - 1;
+					tagMetadata = tagObject[1];
 					break;
 				}
 			}
 
-			buffer.writeu8(buf, currentOffset, tagIndex);
+			if (byteSize === 1) {
+				buffer.writeu8(buf, currentOffset, tagIndex);
+			} else {
+				buffer.writeu16(buf, currentOffset, tagIndex);
+			}
 
-			serialize(value, tagged[tagIndex][1]);
+			serialize(value, tagMetadata);
 		} else if (kind === "literal") {
 			const literals = meta[1];
 			const isSingleLiteral = meta[2];

@@ -62,6 +62,7 @@ function optimizeSerializerData(data: SerializerData): SerializerData {
 			data[0],
 			data[1],
 			data[2].map(([key, data]): [unknown, SerializerData] => [key, optimizeSerializerData(data)]),
+			data[2].size() <= 256 ? 1 : 2,
 		];
 	} else if (data[0] === "map") {
 		data = [data[0], optimizeSerializerData(data[1]), optimizeSerializerData(data[2])];
