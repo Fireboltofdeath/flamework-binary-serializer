@@ -128,33 +128,45 @@ export function createSerializer<T>(meta: SerializerData) {
 				buffer.writeu8(buf, currentOffset, 0);
 			}
 		} else if (kind === "union") {
-			allocate(1);
-
 			const tagName = meta[1];
 			const tagged = meta[2];
+			const byteSize = meta[3];
 			const objectTag = (value as Map<unknown, unknown>).get(tagName);
+			allocate(byteSize);
 
 			let tagIndex = 0;
+			let tagMetadata!: SerializerData;
 			for (const i of $range(1, tagged.size())) {
-				if (tagged[i - 1][0] === objectTag) {
+				const tagObject = tagged[i - 1];
+				if (tagObject[0] === objectTag) {
 					tagIndex = i - 1;
+					tagMetadata = tagObject[1];
 					break;
 				}
 			}
 
-			buffer.writeu8(buf, currentOffset, tagIndex);
+			if (byteSize === 1) {
+				buffer.writeu8(buf, currentOffset, tagIndex);
+			} else {
+				buffer.writeu16(buf, currentOffset, tagIndex);
+			}
 
-			serialize(value, tagged[tagIndex][1]);
+			serialize(value, tagMetadata);
 		} else if (kind === "literal") {
+			// We support `undefined` as a literal, but `indexOf` will actually return -1
+			// This is fine, though, as -1 will serialize as the max integer which will be undefined on unions that do not exceed the size limit.
 			const literals = meta[1];
-			const isSingleLiteral = meta[2];
-			if (!isSingleLiteral) {
+			const byteSize = meta[2];
+			if (byteSize === 1) {
 				const index = literals.indexOf(value as defined);
 				allocate(1);
 
-				// We support `undefined` as a literal, but `indexOf` will actually return -1
-				// This is fine, though, as -1 will serialize as 255 which is guarantee to be undefined with the 8 bit size limit.
 				buffer.writeu8(buf, currentOffset, index);
+			} else if (byteSize === 2) {
+				const index = literals.indexOf(value as defined);
+				allocate(2);
+
+				buffer.writeu16(buf, currentOffset, index);
 			}
 		} else if (kind === "blob") {
 			// Value will always be defined because if it isn't, it will be wrapped in `optional`

@@ -21,7 +21,7 @@ type ArrayMetadata<T extends unknown[]> = [T] extends [{ length: number }]
  * This can be used in your own user macros to generate serializers for arbitrary types, such as for a networking library.
  */
 export type SerializerMetadata<T> = IsLiteralUnion<T> extends true
-	? ["literal", NonNullable<T>[], true extends IsUnion<T> ? false : true]
+	? ["literal", NonNullable<T>[], true extends IsUnion<T> ? (undefined extends T ? 1 : 0) : -1]
 	: unknown extends T
 	? ["optional", ["blob"]]
 	: undefined extends T
@@ -63,6 +63,8 @@ export type SerializerMetadata<T> = IsLiteralUnion<T> extends true
 			FindDiscriminator<T> extends infer D
 				? (T extends T ? [T[D & keyof T], SerializerMetadata<Omit<T, D & keyof T>>] : never)[]
 				: never,
+			// This is the byte size length. This is annoying (and slow) to calculate in TS, so it's done at runtime.
+			-1,
 	  ]
 	: true extends HasNominal<keyof T>
 	? ["blob"]
@@ -95,11 +97,11 @@ export type SerializerData =
 	| ["vector"]
 	| ["object", Array<string | SerializerData>, object]
 	| ["object_raw", [string, SerializerData][]]
-	| ["union", string, [unknown, SerializerData][]]
+	| ["union", string, [unknown, SerializerData][], number]
 	| ["array", SerializerData]
 	| ["tuple", SerializerData[], SerializerData | undefined]
 	| ["map", SerializerData, SerializerData]
 	| ["set", SerializerData]
 	| ["optional", SerializerData]
-	| ["literal", defined[], boolean]
+	| ["literal", defined[], number]
 	| ["blob"];

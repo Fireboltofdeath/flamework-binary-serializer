@@ -121,9 +121,10 @@ export function createDeserializer<T>(meta: SerializerData) {
 			offset += 1;
 			return buffer.readu8(buf, currentOffset) === 1 ? deserialize(meta[1]) : undefined;
 		} else if (kind === "union") {
-			offset += 1;
+			const byteSize = meta[3];
+			const tagIndex = byteSize === 1 ? buffer.readu8(buf, currentOffset) : buffer.readu16(buf, currentOffset);
+			offset += byteSize;
 
-			const tagIndex = buffer.readu8(buf, currentOffset);
 			const tag = meta[2][tagIndex];
 			const object = deserialize(tag[1]);
 			(object as Record<string, unknown>)[meta[1]] = tag[0];
@@ -131,12 +132,15 @@ export function createDeserializer<T>(meta: SerializerData) {
 			return object;
 		} else if (kind === "literal") {
 			const literals = meta[1];
-			const isSingleLiteral = meta[2];
-			if (isSingleLiteral) {
-				return literals[0];
-			} else {
+			const byteSize = meta[2];
+			if (byteSize === 1) {
 				offset += 1;
 				return literals[buffer.readu8(buf, currentOffset)];
+			} else if (byteSize === 2) {
+				offset += 2;
+				return literals[buffer.readu16(buf, currentOffset)];
+			} else {
+				return literals[0];
 			}
 		} else if (kind === "blob") {
 			blobIndex++;
