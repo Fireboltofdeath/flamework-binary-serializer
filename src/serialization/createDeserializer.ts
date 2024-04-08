@@ -145,6 +145,26 @@ export function createDeserializer<T>(meta: SerializerData) {
 		} else if (kind === "blob") {
 			blobIndex++;
 			return blobs![blobIndex - 1];
+		} else if (kind === "packed") {
+			const bitfields = meta[1];
+			const objectType = meta[2];
+			const bytes = meta[3];
+			offset += bytes;
+
+			// We already moved the offset to the right, so we can do this to get access to an object to write to.
+			const object = deserialize(objectType);
+			const bitfieldCount = bitfields.size();
+
+			for (const byte of $range(0, bytes - 1)) {
+				const currentByte = buffer.readu8(buf, currentOffset + byte);
+
+				for (const bit of $range(0, math.min(7, bitfieldCount - byte * 8 - 1))) {
+					const value = (currentByte >>> bit) % 2 === 1;
+					(object as Record<string, boolean>)[bitfields[bit + byte * 8]] = value;
+				}
+			}
+
+			return object;
 		} else {
 			error(`unexpected kind: ${kind}`);
 		}

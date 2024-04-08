@@ -171,6 +171,25 @@ export function createSerializer<T>(meta: SerializerData) {
 		} else if (kind === "blob") {
 			// Value will always be defined because if it isn't, it will be wrapped in `optional`
 			blobs.push(value!);
+		} else if (kind === "packed") {
+			const bitfields = meta[1];
+			const objectType = meta[2];
+			const bytes = meta[3];
+			allocate(bytes);
+
+			const bitfieldCount = bitfields.size();
+			for (const byte of $range(0, bytes - 1)) {
+				let currentByte = 0;
+
+				for (const bit of $range(0, math.min(7, bitfieldCount - byte * 8 - 1))) {
+					const field = (value as Record<string, boolean>)[bitfields[bit + byte * 8]];
+					currentByte += (field ? 1 : 0) << bit;
+				}
+
+				buffer.writeu8(buf, currentOffset + byte, currentByte);
+			}
+
+			serialize(value, objectType);
 		} else {
 			error(`unexpected kind: ${kind}`);
 		}
