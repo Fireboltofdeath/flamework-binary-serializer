@@ -49,6 +49,23 @@ export interface Data {
 
 	map: Map<Instance, boolean>;
 	set: Set<{ type: "string"; value: string } | { type: "number"; value: number }>;
+
+	packed: PackedObject;
+}
+
+// This interface will take up 2 bytes.
+// 1 byte for the i8, and 1 byte for 8 booleans.
+// Without packing, this interface would take 9 bytes.
+interface PackedObject extends DataType.Packed {
+	num: DataType.i8;
+	a: boolean;
+	b: boolean;
+	c: boolean;
+	d: boolean;
+	e: boolean;
+	f: boolean;
+	g: boolean;
+	h: boolean;
 }
 
 const testData: Data = {
@@ -81,6 +98,18 @@ const testData: Data = {
 
 	map: new Map(),
 	set: new Set(),
+
+	packed: {
+		num: 35,
+		a: true,
+		b: false,
+		c: true,
+		d: false,
+		e: true,
+		f: false,
+		g: true,
+		h: false,
+	},
 };
 
 testData.map.set(testData.blob, true);
