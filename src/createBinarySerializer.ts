@@ -74,6 +74,8 @@ function optimizeSerializerData(data: SerializerData): SerializerData {
 		// to determine the final required size.
 		// A size of -1 means this isn't a union.
 		data = [data[0], data[1], data[2] === -1 ? 0 : data[2] + data[1].size() <= 256 ? 1 : 2];
+	} else if (data[0] === "packed") {
+		data = [data[0], data[1], optimizeSerializerData(data[2]), math.ceil(data[1].size() / 8)];
 	}
 
 	return data;
