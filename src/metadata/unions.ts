@@ -27,6 +27,7 @@ type FindPossibleDiscriminators<T> = ToSharedValues<
 		  }
 		: never
 >;
+
 // This type excludes discriminators whose values are not unique between all constituents.
 type FilterUniqueDiscriminators<T, D extends keyof T, U extends T = T> = D extends D
 	? (T extends T ? (T[D] extends Exclude<U, T>[D] ? unknown : D) : never) extends D
