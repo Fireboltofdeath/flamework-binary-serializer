@@ -1,4 +1,4 @@
-type FilterNever<T> = { [k in { [k in keyof T]: T[k] extends never ? never : k }[keyof T]]: T[k] };
+type ToSharedValues<T> = UnionToIntersection<T extends T ? [T[keyof T]] : never>[never];
 
 type IsLiteral<T> = T extends undefined
 	? true
@@ -16,10 +16,25 @@ type IsLiteral<T> = T extends undefined
 
 export type IsUnion<T, U = T> = T extends T ? (U extends T ? never : true) : never;
 
-export type FindDiscriminator<T> = keyof T &
-	keyof (T extends T
-		? FilterNever<{ [k in keyof T]: T[k] extends string ? (string extends T[k] ? never : k) : never }>
-		: never);
+// This type finds all fields that are:
+// 1. Shared across every constituent
+// 2. Is not a union (as multiple discriminator values are not supported)
+// 3. Is a literal (string, number, boolean, undefined)
+type FindPossibleDiscriminators<T> = ToSharedValues<
+	T extends T
+		? {
+				[k in keyof T]-?: true extends IsUnion<T[k]> ? never : true extends IsLiteral<T[k]> ? k : never;
+		  }
+		: never
+>;
+// This type excludes discriminators whose values are not unique between all constituents.
+type FilterUniqueDiscriminators<T, D extends keyof T, U extends T = T> = D extends D
+	? (T extends T ? (T[D] extends Exclude<U, T>[D] ? unknown : D) : never) extends D
+		? D
+		: never
+	: never;
+
+export type FindDiscriminator<T> = FilterUniqueDiscriminators<T, FindPossibleDiscriminators<T>>;
 
 export type IsDiscriminableUnion<T> = true extends IsUnion<T>
 	? FindDiscriminator<T> extends never
