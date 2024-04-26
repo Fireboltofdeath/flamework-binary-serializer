@@ -190,6 +190,17 @@ export function createSerializer<T>(meta: SerializerData) {
 			}
 
 			serialize(value, objectType);
+		} else if (kind === "cframe") {
+			allocate(4 * 6);
+
+			buffer.writef32(buf, currentOffset, (value as CFrame).X);
+			buffer.writef32(buf, currentOffset + 4, (value as CFrame).Y);
+			buffer.writef32(buf, currentOffset + 8, (value as CFrame).Z);
+
+			const [axis, angle] = (value as CFrame).ToAxisAngle();
+			buffer.writef32(buf, currentOffset + 12, axis.X * angle);
+			buffer.writef32(buf, currentOffset + 16, axis.Y * angle);
+			buffer.writef32(buf, currentOffset + 20, axis.Z * angle);
 		} else {
 			error(`unexpected kind: ${kind}`);
 		}
