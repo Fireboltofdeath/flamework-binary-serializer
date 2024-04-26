@@ -201,6 +201,40 @@ export function createSerializer<T>(meta: SerializerData) {
 			buffer.writef32(buf, currentOffset + 12, axis.X * angle);
 			buffer.writef32(buf, currentOffset + 16, axis.Y * angle);
 			buffer.writef32(buf, currentOffset + 20, axis.Z * angle);
+		} else if (kind === "colorsequence") {
+			const keypoints = (value as ColorSequence).Keypoints;
+			const keypointCount = keypoints.size();
+			allocate(1 + keypointCount * 16);
+
+			buffer.writeu8(buf, currentOffset, keypointCount);
+
+			for (const i of $range(1, keypointCount)) {
+				const keypointOffset = currentOffset + 1 + 16 * (i - 1);
+				const keypoint = keypoints[i - 1];
+				buffer.writef32(buf, keypointOffset, keypoint.Time);
+				buffer.writef32(buf, keypointOffset + 4, keypoint.Value.R);
+				buffer.writef32(buf, keypointOffset + 8, keypoint.Value.G);
+				buffer.writef32(buf, keypointOffset + 12, keypoint.Value.B);
+			}
+		} else if (kind === "numbersequence") {
+			const keypoints = (value as NumberSequence).Keypoints;
+			const keypointCount = keypoints.size();
+			allocate(1 + keypointCount * 8);
+
+			buffer.writeu8(buf, currentOffset, keypointCount);
+
+			for (const i of $range(1, keypointCount)) {
+				const keypointOffset = currentOffset + 1 + 8 * (i - 1);
+				const keypoint = keypoints[i - 1];
+				buffer.writef32(buf, keypointOffset, keypoint.Time);
+				buffer.writef32(buf, keypointOffset + 4, keypoint.Value);
+			}
+		} else if (kind === "color3") {
+			allocate(12);
+
+			buffer.writef32(buf, currentOffset, (value as Color3).R);
+			buffer.writef32(buf, currentOffset + 4, (value as Color3).G);
+			buffer.writef32(buf, currentOffset + 8, (value as Color3).B);
 		} else {
 			error(`unexpected kind: ${kind}`);
 		}

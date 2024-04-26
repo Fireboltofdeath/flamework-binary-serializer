@@ -17,6 +17,18 @@ type ArrayMetadata<T extends unknown[]> = [T] extends [{ length: number }]
 	: ["array", SerializerMetadata<T[number]>];
 
 /**
+ * A shortcut for defining Roblox datatypes (which map directly to a simple type.)
+ *
+ * This may in the future be used to reduce the number of branches inside the serializer.
+ */
+interface DataTypes {
+	cframe: CFrame;
+	numbersequence: NumberSequence;
+	colorsequence: ColorSequence;
+	color3: Color3;
+}
+
+/**
  * This is the metadata expected by the `createSerializer` function.
  *
  * This can be used in your own user macros to generate serializers for arbitrary types, such as for a networking library.
@@ -51,8 +63,8 @@ export type SerializerMetadata<T> = IsLiteralUnion<T> extends true
 	? ["string"]
 	: [T] extends [Vector3]
 	? ["vector"]
-	: [T] extends [CFrame]
-	? ["cframe"]
+	: [T] extends [DataTypes[keyof DataTypes]]
+	? [ExtractKeys<DataTypes, T>]
 	: [T] extends [unknown[]]
 	? ArrayMetadata<T>
 	: [T] extends [ReadonlyMap<infer K, infer V>]
@@ -111,4 +123,4 @@ export type SerializerData =
 	| ["optional", SerializerData]
 	| ["literal", defined[], number]
 	| ["blob"]
-	| ["cframe"];
+	| { [k in keyof DataTypes]: [k] }[keyof DataTypes];

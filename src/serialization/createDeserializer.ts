@@ -181,6 +181,46 @@ export function createDeserializer<T>(meta: SerializerData) {
 			);
 
 			return CFrame.fromAxisAngle(rotation.Unit, rotation.Magnitude).add(position);
+		} else if (kind === "colorsequence") {
+			const keypointCount = buffer.readu8(buf, currentOffset);
+			const keypoints = new Array<ColorSequenceKeypoint>();
+			offset += 1 + keypointCount * 16;
+
+			for (const i of $range(1, keypointCount)) {
+				const keypointOffset = currentOffset + 1 + 16 * (i - 1);
+				const time = buffer.readf32(buf, keypointOffset);
+				const value = new Color3(
+					buffer.readf32(buf, keypointOffset + 4),
+					buffer.readf32(buf, keypointOffset + 8),
+					buffer.readf32(buf, keypointOffset + 12),
+				);
+
+				keypoints.push(new ColorSequenceKeypoint(time, value));
+			}
+
+			return new ColorSequence(keypoints);
+		} else if (kind === "numbersequence") {
+			const keypointCount = buffer.readu8(buf, currentOffset);
+			const keypoints = new Array<NumberSequenceKeypoint>();
+			offset += 1 + keypointCount * 8;
+
+			for (const i of $range(1, keypointCount)) {
+				const keypointOffset = currentOffset + 1 + 8 * (i - 1);
+				const time = buffer.readf32(buf, keypointOffset);
+				const value = buffer.readf32(buf, keypointOffset + 4);
+
+				keypoints.push(new NumberSequenceKeypoint(time, value));
+			}
+
+			return new NumberSequence(keypoints);
+		} else if (kind === "color3") {
+			offset += 12;
+
+			return new Color3(
+				buffer.readf32(buf, currentOffset),
+				buffer.readf32(buf, currentOffset + 4),
+				buffer.readf32(buf, currentOffset + 8),
+			);
 		} else {
 			error(`unexpected kind: ${kind}`);
 		}
