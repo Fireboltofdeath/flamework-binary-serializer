@@ -51,6 +51,8 @@ export type SerializerMetadata<T> = IsLiteralUnion<T> extends true
 	? ["string"]
 	: [T] extends [Vector3]
 	? ["vector"]
+	: [T] extends [CFrame]
+	? ["cframe"]
 	: [T] extends [unknown[]]
 	? ArrayMetadata<T>
 	: [T] extends [ReadonlyMap<infer K, infer V>]
@@ -108,4 +110,5 @@ export type SerializerData =
 	| ["set", SerializerData]
 	| ["optional", SerializerData]
 	| ["literal", defined[], number]
-	| ["blob"];
+	| ["blob"]
+	| ["cframe"];

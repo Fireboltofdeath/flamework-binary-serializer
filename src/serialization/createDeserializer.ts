@@ -165,6 +165,22 @@ export function createDeserializer<T>(meta: SerializerData) {
 			}
 
 			return object;
+		} else if (kind === "cframe") {
+			offset += 4 * 6;
+
+			const position = new Vector3(
+				buffer.readf32(buf, currentOffset),
+				buffer.readf32(buf, currentOffset + 4),
+				buffer.readf32(buf, currentOffset + 8),
+			);
+
+			const rotation = new Vector3(
+				buffer.readf32(buf, currentOffset + 12),
+				buffer.readf32(buf, currentOffset + 16),
+				buffer.readf32(buf, currentOffset + 20),
+			);
+
+			return CFrame.fromAxisAngle(rotation.Unit, rotation.Magnitude).add(position);
 		} else {
 			error(`unexpected kind: ${kind}`);
 		}
