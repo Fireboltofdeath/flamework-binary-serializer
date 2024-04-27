@@ -29,6 +29,10 @@ export interface Data {
 	i32: DataType.i32;
 
 	vector: Vector3;
+	cframe: CFrame;
+	color3: Color3;
+	colorSequence: ColorSequence;
+	numberSequence: NumberSequence;
 
 	boolean: boolean;
 	string: string;
@@ -81,6 +85,18 @@ const testData: Data = {
 	i32: 850928,
 
 	vector: new Vector3(4, 2, 0),
+	cframe: new CFrame(6, 6, 6).mul(CFrame.fromOrientation(math.rad(15), math.rad(25), math.rad(35))),
+	color3: new Color3(0.5258, 0.1919, 0.666),
+	colorSequence: new ColorSequence([
+		new ColorSequenceKeypoint(0, new Color3(1, 0, 0)),
+		new ColorSequenceKeypoint(0.5, new Color3(0, 1, 0)),
+		new ColorSequenceKeypoint(1, new Color3(0, 0, 1)),
+	]),
+	numberSequence: new NumberSequence([
+		new NumberSequenceKeypoint(0, 0.2),
+		new NumberSequenceKeypoint(0.5, 1.75),
+		new NumberSequenceKeypoint(1, 250),
+	]),
 
 	boolean: true,
 	string: "hello i am a string!",
