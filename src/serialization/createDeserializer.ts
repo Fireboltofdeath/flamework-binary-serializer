@@ -180,7 +180,9 @@ export function createDeserializer<T>(meta: SerializerData) {
 				buffer.readf32(buf, currentOffset + 20),
 			);
 
-			return CFrame.fromAxisAngle(rotation.Unit, rotation.Magnitude).add(position);
+			return rotation.Magnitude === 0
+				? new CFrame(position)
+				: CFrame.fromAxisAngle(rotation.Unit, rotation.Magnitude).add(position);
 		} else if (kind === "colorsequence") {
 			const keypointCount = buffer.readu8(buf, currentOffset);
 			const keypoints = new Array<ColorSequenceKeypoint>();
