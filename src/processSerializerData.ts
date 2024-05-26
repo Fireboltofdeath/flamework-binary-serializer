@@ -9,7 +9,8 @@ const enum IterationFlags {
 export interface ProcessedInfo {
 	flags: IterationFlags;
 	containsPacking: boolean;
-	packingBits: number | undefined;
+	containsUnknownPacking: boolean;
+	packingBits: number;
 }
 
 export interface ProcessedSerializerData extends ProcessedInfo {
@@ -17,10 +18,11 @@ export interface ProcessedSerializerData extends ProcessedInfo {
 }
 
 function addPackedBit(info: ProcessedInfo) {
-	if ((info.flags & IterationFlags.Packed) !== 0 && info.packingBits !== undefined) {
+	if ((info.flags & IterationFlags.Packed) !== 0) {
 		if ((info.flags & IterationFlags.SizeUnknown) !== 0) {
-			info.packingBits = undefined;
+			info.containsUnknownPacking = true;
 		} else {
+			// We only keep track of guaranteed packing bits, which we can use for optimization.
 			info.packingBits += 1;
 		}
 	}
@@ -106,6 +108,7 @@ export function processSerializerData(rawData: SerializerData): ProcessedSeriali
 		data: rawData,
 		flags: IterationFlags.Default,
 		containsPacking: false,
+		containsUnknownPacking: false,
 		packingBits: 0,
 	};
 

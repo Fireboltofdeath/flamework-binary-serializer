@@ -235,16 +235,16 @@ export function createDeserializer<T>(info: ProcessedSerializerData) {
 
 		if (info.containsPacking) {
 			let byteCount;
-			if (info.packingBits !== undefined) {
-				byteCount = math.ceil(info.packingBits / 8);
-			} else {
+			if (info.containsUnknownPacking) {
 				byteCount = buffer.readu8(buf, 0);
 				offset++;
+			} else {
+				byteCount = math.ceil(info.packingBits / 8);
 			}
 
 			bits = table.create(byteCount * 8);
 
-			for (const _ of $range(0, byteCount - 1)) {
+			for (const _ of $range(1, byteCount)) {
 				const currentByte = buffer.readu8(buf, offset);
 
 				for (const bit of $range(0, 7)) {
