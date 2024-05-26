@@ -20,6 +20,8 @@ export interface ProcessedSerializerData extends ProcessedInfo {
 
 function addPackedBit(info: ProcessedInfo) {
 	if ((info.flags & IterationFlags.Packed) !== 0) {
+		info.containsPacking = true;
+
 		if ((info.flags & IterationFlags.SizeUnknown) !== 0) {
 			info.containsUnknownPacking = true;
 		} else {
@@ -92,7 +94,6 @@ function iterateSerializerData(data: SerializerData, info: ProcessedInfo): Seria
 		data = [kind, data[1], data[2] === -1 ? 0 : data[2] + data[1].size() <= 256 ? 1 : 2];
 	} else if (kind === "packed") {
 		info.flags |= IterationFlags.Packed;
-		info.containsPacking = true;
 
 		data = [kind, iterateSerializerData(data[1], info)];
 	} else if (kind === "boolean") {
