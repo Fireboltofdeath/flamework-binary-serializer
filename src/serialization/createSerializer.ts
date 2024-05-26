@@ -4,11 +4,11 @@ import type { SerializerData } from "../metadata";
 import type { ProcessedSerializerData } from "../processSerializerData";
 
 export function createSerializer<T>(info: ProcessedSerializerData) {
+	const bits = table.create<boolean>(info.minimumPackedBits);
 	let currentSize = 2 ** 8;
 	let buf = buffer.create(currentSize);
 	let offset!: number;
 	let blobs!: defined[];
-	let bits!: boolean[];
 	let packing = false;
 
 	function allocate(size: number) {
@@ -240,13 +240,19 @@ export function createSerializer<T>(info: ProcessedSerializerData) {
 		}
 	}
 
-	function writeBits(buf: buffer, offset: number, byteCount: number) {
+	function writeBits(buf: buffer, offset: number, bitOffset: number, bytes: number, variable: boolean) {
 		const bitSize = bits.size();
-		for (const byte of $range(0, byteCount - 1)) {
+
+		for (const byte of $range(0, bytes - 1)) {
 			let currentByte = 0;
 
-			for (const bit of $range(0, math.min(7, bitSize - byte * 8 - 1))) {
-				currentByte += (bits[byte * 8 + bit] ? 1 : 0) << bit;
+			for (const bit of $range(variable ? 1 : 0, math.min(7, bitSize - bitOffset - 1))) {
+				currentByte += (bits[bitOffset] ? 1 : 0) << bit;
+				bitOffset += 1;
+			}
+
+			if (variable && byte !== bytes - 1) {
+				currentByte += 1;
 			}
 
 			buffer.writeu8(buf, offset, currentByte);
@@ -255,29 +261,42 @@ export function createSerializer<T>(info: ProcessedSerializerData) {
 		}
 	}
 
+	function calculatePackedBytes() {
+		const minimumBytes = info.minimumPackedBytes;
+
+		if (info.containsUnknownPacking) {
+			const variableBytes = math.max(1, math.ceil((bits.size() - minimumBytes * 8) / 7));
+			const totalByteCount = minimumBytes + variableBytes;
+
+			return $tuple(minimumBytes, variableBytes, totalByteCount);
+		}
+
+		return $tuple(minimumBytes, 0, minimumBytes);
+	}
+
 	return (value: T) => {
 		offset = 0;
 		blobs = [];
-		bits = table.create(info.packingBits);
+		table.clear(bits);
 		serialize(value, info.data);
 
-		if (!info.containsPacking) {
-			const trim = buffer.create(offset);
-			buffer.copy(trim, 0, buf, 0, offset);
+		if (info.containsPacking) {
+			const [minimumBytes, variableBytes, totalBytes] = calculatePackedBytes();
+			const trim = buffer.create(offset + totalBytes);
+			buffer.copy(trim, totalBytes, buf, 0, offset);
+
+			if (minimumBytes > 0) {
+				writeBits(trim, 0, 0, minimumBytes, false);
+			}
+
+			if (variableBytes > 0) {
+				writeBits(trim, minimumBytes, minimumBytes * 8, variableBytes, true);
+			}
 
 			return { buffer: trim, blobs };
 		} else {
-			// This serializer contains a packed struct, which stores a bit array at the front of the buffer.
-			const lengthOffset = info.containsUnknownPacking ? 1 : 0;
-			const byteCount = math.ceil(bits.size() / 8);
-			const trim = buffer.create(offset + byteCount + lengthOffset);
-			buffer.copy(trim, byteCount + lengthOffset, buf, 0, offset);
-
-			writeBits(trim, lengthOffset, byteCount);
-
-			if (info.containsUnknownPacking) {
-				buffer.writeu8(trim, 0, byteCount);
-			}
+			const trim = buffer.create(offset);
+			buffer.copy(trim, 0, buf, 0, offset);
 
 			return { buffer: trim, blobs };
 		}

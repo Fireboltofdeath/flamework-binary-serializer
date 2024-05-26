@@ -4,13 +4,13 @@ import type { SerializerData } from "../metadata";
 import type { ProcessedSerializerData } from "../processSerializerData";
 
 export function createDeserializer<T>(info: ProcessedSerializerData) {
+	const bits = table.create<boolean>(math.ceil(info.minimumPackedBits / 8) * 8);
+	let bitIndex = 0;
 	let buf!: buffer;
 	let offset!: number;
 	let blobs: defined[] | undefined;
 	let blobIndex = 0;
 	let packing = false;
-	let bits!: boolean[];
-	let bitIndex = 0;
 
 	function deserialize(meta: SerializerData): unknown {
 		const currentOffset = offset;
@@ -227,33 +227,42 @@ export function createDeserializer<T>(info: ProcessedSerializerData) {
 		}
 	}
 
+	function readBits() {
+		const guaranteedBytes = info.minimumPackedBytes;
+
+		while (true) {
+			const currentByte = buffer.readu8(buf, offset);
+			const guaranteedByte = offset < guaranteedBytes;
+
+			for (const bit of $range(guaranteedByte ? 0 : 1, 7)) {
+				const value = (currentByte >>> bit) % 2 === 1;
+				bits.push(value);
+			}
+
+			offset += 1;
+
+			// Variable bit indicated the end.
+			if (!guaranteedByte && currentByte % 2 === 0) {
+				break;
+			}
+
+			// We only have guaranteed bits and we reached the end.
+			if (!info.containsUnknownPacking && offset === guaranteedBytes) {
+				break;
+			}
+		}
+	}
+
 	return (input: buffer, inputBlobs?: defined[]) => {
 		blobs = inputBlobs;
 		buf = input;
 		offset = 0;
 		blobIndex = 0;
+		bitIndex = 0;
 
 		if (info.containsPacking) {
-			let byteCount;
-			if (info.containsUnknownPacking) {
-				byteCount = buffer.readu8(buf, 0);
-				offset++;
-			} else {
-				byteCount = math.ceil(info.packingBits / 8);
-			}
-
-			bits = table.create(byteCount * 8);
-
-			for (const _ of $range(1, byteCount)) {
-				const currentByte = buffer.readu8(buf, offset);
-
-				for (const bit of $range(0, 7)) {
-					const value = (currentByte >>> bit) % 2 === 1;
-					bits.push(value);
-				}
-
-				offset += 1;
-			}
+			table.clear(bits);
+			readBits();
 		}
 
 		return deserialize(info.data) as T;

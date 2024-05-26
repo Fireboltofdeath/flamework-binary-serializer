@@ -10,7 +10,8 @@ export interface ProcessedInfo {
 	flags: IterationFlags;
 	containsPacking: boolean;
 	containsUnknownPacking: boolean;
-	packingBits: number;
+	minimumPackedBits: number;
+	minimumPackedBytes: number;
 }
 
 export interface ProcessedSerializerData extends ProcessedInfo {
@@ -23,7 +24,7 @@ function addPackedBit(info: ProcessedInfo) {
 			info.containsUnknownPacking = true;
 		} else {
 			// We only keep track of guaranteed packing bits, which we can use for optimization.
-			info.packingBits += 1;
+			info.minimumPackedBits += 1;
 		}
 	}
 }
@@ -51,8 +52,8 @@ function iterateSerializerData(data: SerializerData, info: ProcessedInfo): Seria
 
 		data = ["object", transformed, preallocation];
 	} else if (kind === "optional") {
-		info.flags |= IterationFlags.SizeUnknown;
 		addPackedBit(info);
+		info.flags |= IterationFlags.SizeUnknown;
 
 		data = [kind, iterateSerializerData(data[1], info)];
 	} else if (kind === "array" || kind === "set") {
@@ -103,15 +104,21 @@ function iterateSerializerData(data: SerializerData, info: ProcessedInfo): Seria
 	return data;
 }
 
+function getMinimumPackedBytes(info: ProcessedSerializerData) {
+	return math.max(0, math.ceil(info.minimumPackedBits / 8) - (info.containsUnknownPacking ? 1 : 0));
+}
+
 export function processSerializerData(rawData: SerializerData): ProcessedSerializerData {
 	const processedInfo: ProcessedSerializerData = {
 		data: rawData,
 		flags: IterationFlags.Default,
 		containsPacking: false,
 		containsUnknownPacking: false,
-		packingBits: 0,
+		minimumPackedBits: 0,
+		minimumPackedBytes: 0,
 	};
 
 	processedInfo.data = iterateSerializerData(rawData, processedInfo);
+	processedInfo.minimumPackedBytes = getMinimumPackedBytes(processedInfo);
 	return processedInfo;
 }
