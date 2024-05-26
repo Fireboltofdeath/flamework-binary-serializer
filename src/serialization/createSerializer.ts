@@ -1,12 +1,15 @@
 //!native
 //!optimize 2
 import type { SerializerData } from "../metadata";
+import type { ProcessedSerializerData } from "../processSerializerData";
 
-export function createSerializer<T>(meta: SerializerData) {
+export function createSerializer<T>(info: ProcessedSerializerData) {
 	let currentSize = 2 ** 8;
 	let buf = buffer.create(currentSize);
 	let offset!: number;
 	let blobs!: defined[];
+	let bits!: boolean[];
+	let packing = false;
 
 	function allocate(size: number) {
 		offset += size;
@@ -48,6 +51,8 @@ export function createSerializer<T>(meta: SerializerData) {
 		} else if (kind === "i32") {
 			allocate(4);
 			buffer.writei32(buf, currentOffset, value as number);
+		} else if (kind === "boolean" && packing) {
+			bits.push(value as boolean);
 		} else if (kind === "boolean") {
 			allocate(1);
 			buffer.writeu8(buf, currentOffset, value === true ? 1 : 0);
@@ -119,6 +124,13 @@ export function createSerializer<T>(meta: SerializerData) {
 
 			// We already allocated this space before serializing the set, so this is safe.
 			buffer.writeu32(buf, currentOffset, size);
+		} else if (kind === "optional" && packing) {
+			if (value !== undefined) {
+				bits.push(true);
+				serialize(value, meta[1]);
+			} else {
+				bits.push(false);
+			}
 		} else if (kind === "optional") {
 			allocate(1);
 			if (value !== undefined) {
@@ -172,24 +184,12 @@ export function createSerializer<T>(meta: SerializerData) {
 			// Value will always be defined because if it isn't, it will be wrapped in `optional`
 			blobs.push(value!);
 		} else if (kind === "packed") {
-			const bitfields = meta[1];
-			const objectType = meta[2];
-			const bytes = meta[3];
-			allocate(bytes);
+			const innerType = meta[1];
+			const wasPacking = packing;
+			packing = true;
 
-			const bitfieldCount = bitfields.size();
-			for (const byte of $range(0, bytes - 1)) {
-				let currentByte = 0;
-
-				for (const bit of $range(0, math.min(7, bitfieldCount - byte * 8 - 1))) {
-					const field = (value as Record<string, boolean>)[bitfields[bit + byte * 8]];
-					currentByte += (field ? 1 : 0) << bit;
-				}
-
-				buffer.writeu8(buf, currentOffset + byte, currentByte);
-			}
-
-			serialize(value, objectType);
+			serialize(value, innerType);
+			packing = wasPacking;
 		} else if (kind === "cframe") {
 			allocate(4 * 6);
 
@@ -240,17 +240,46 @@ export function createSerializer<T>(meta: SerializerData) {
 		}
 	}
 
+	function writeBits(buf: buffer, offset: number, byteCount: number) {
+		const bitSize = bits.size();
+		for (const byte of $range(0, byteCount - 1)) {
+			let currentByte = 0;
+
+			for (const bit of $range(0, math.min(7, bitSize - byte * 8 - 1))) {
+				currentByte += (bits[bit] ? 1 : 0) << bit;
+			}
+
+			buffer.writeu8(buf, offset, currentByte);
+
+			offset += 1;
+		}
+	}
+
 	return (value: T) => {
 		offset = 0;
 		blobs = [];
-		serialize(value, meta);
+		bits = [];
+		serialize(value, info.data);
 
-		const trim = buffer.create(offset);
-		buffer.copy(trim, 0, buf, 0, offset);
+		if (!info.containsPacking) {
+			const trim = buffer.create(offset);
+			buffer.copy(trim, 0, buf, 0, offset);
 
-		return {
-			buffer: trim,
-			blobs: blobs,
-		};
+			return { buffer: trim, blobs };
+		} else {
+			// This serializer contains a packed struct, which stores a bit array at the front of the buffer.
+			const lengthOffset = info.packingBits === undefined ? 1 : 0;
+			const byteCount = math.ceil(bits.size() / 8);
+			const trim = buffer.create(offset + byteCount + lengthOffset);
+			buffer.copy(trim, byteCount + lengthOffset, buf, 0, offset);
+
+			writeBits(trim, lengthOffset, byteCount);
+
+			if (info.packingBits === undefined) {
+				buffer.writeu8(trim, 0, byteCount);
+			}
+
+			return { buffer: trim, blobs };
+		}
 	};
 }

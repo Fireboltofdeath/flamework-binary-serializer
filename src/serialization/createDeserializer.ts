@@ -1,12 +1,16 @@
 //!native
 //!optimize 2
 import type { SerializerData } from "../metadata";
+import type { ProcessedSerializerData } from "../processSerializerData";
 
-export function createDeserializer<T>(meta: SerializerData) {
+export function createDeserializer<T>(info: ProcessedSerializerData) {
 	let buf!: buffer;
 	let offset!: number;
 	let blobs: defined[] | undefined;
 	let blobIndex = 0;
+	let packing = false;
+	let bits!: boolean[];
+	let bitIndex = 0;
 
 	function deserialize(meta: SerializerData): unknown {
 		const currentOffset = offset;
@@ -35,6 +39,9 @@ export function createDeserializer<T>(meta: SerializerData) {
 		} else if (kind === "i32") {
 			offset += 4;
 			return buffer.readi32(buf, currentOffset);
+		} else if (kind === "boolean" && packing) {
+			bitIndex++;
+			return bits[bitIndex - 1];
 		} else if (kind === "boolean") {
 			offset += 1;
 			return buffer.readu8(buf, currentOffset) === 1;
@@ -117,6 +124,9 @@ export function createDeserializer<T>(meta: SerializerData) {
 			}
 
 			return set;
+		} else if (kind === "optional" && packing) {
+			bitIndex++;
+			return bits[bitIndex - 1] ? deserialize(meta[1]) : undefined;
 		} else if (kind === "optional") {
 			offset += 1;
 			return buffer.readu8(buf, currentOffset) === 1 ? deserialize(meta[1]) : undefined;
@@ -146,25 +156,14 @@ export function createDeserializer<T>(meta: SerializerData) {
 			blobIndex++;
 			return blobs![blobIndex - 1];
 		} else if (kind === "packed") {
-			const bitfields = meta[1];
-			const objectType = meta[2];
-			const bytes = meta[3];
-			offset += bytes;
+			const innerType = meta[1];
+			const wasPacking = packing;
+			packing = true;
 
-			// We already moved the offset to the right, so we can do this to get access to an object to write to.
-			const object = deserialize(objectType);
-			const bitfieldCount = bitfields.size();
+			const value = deserialize(innerType);
+			packing = wasPacking;
 
-			for (const byte of $range(0, bytes - 1)) {
-				const currentByte = buffer.readu8(buf, currentOffset + byte);
-
-				for (const bit of $range(0, math.min(7, bitfieldCount - byte * 8 - 1))) {
-					const value = (currentByte >>> bit) % 2 === 1;
-					(object as Record<string, boolean>)[bitfields[bit + byte * 8]] = value;
-				}
-			}
-
-			return object;
+			return value;
 		} else if (kind === "cframe") {
 			offset += 4 * 6;
 
@@ -233,6 +232,30 @@ export function createDeserializer<T>(meta: SerializerData) {
 		buf = input;
 		offset = 0;
 		blobIndex = 0;
-		return deserialize(meta) as T;
+
+		if (info.containsPacking) {
+			let byteCount;
+			if (info.packingBits !== undefined) {
+				byteCount = math.ceil(info.packingBits / 8);
+			} else {
+				byteCount = buffer.readu8(buf, 0);
+				offset++;
+			}
+
+			bits = table.create(byteCount * 8);
+
+			for (const _ of $range(0, byteCount - 1)) {
+				const currentByte = buffer.readu8(buf, offset);
+
+				for (const bit of $range(0, 7)) {
+					const value = (currentByte >>> bit) % 2 === 1;
+					bits.push(value);
+				}
+
+				offset += 1;
+			}
+		}
+
+		return deserialize(info.data) as T;
 	};
 }

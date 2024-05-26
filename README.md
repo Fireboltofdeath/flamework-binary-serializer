@@ -54,13 +54,16 @@ export interface Data {
 	map: Map<Instance, boolean>;
 	set: Set<{ type: "string"; value: string } | { type: "number"; value: number }>;
 
-	packed: PackedObject;
+	packed: DataType.Packed<PackedObject>;
 }
 
-// This interface will take up 2 bytes.
-// 1 byte for the i8, and 1 byte for 8 booleans.
-// Without packing, this interface would take 9 bytes.
-interface PackedObject extends DataType.Packed {
+// This interface will take up a byte and 8-10 bits.
+// 1 byte for the i8, 8 bits (1 byte) for 8 booleans, and 1-2 bits for the optional field.
+// Without packing, this interface would take up to 11 bytes.
+//
+// Packing also optimizes `optional` values by using a single bit for the presence of the value.
+// Packing recursively applies to the entire object, including things like arrays, other objects, etc.
+interface PackedObject {
 	num: DataType.i8;
 	a: boolean;
 	b: boolean;
@@ -70,6 +73,9 @@ interface PackedObject extends DataType.Packed {
 	f: boolean;
 	g: boolean;
 	h: boolean;
+
+	// This only takes up to 2 bits to encode in a packed type!
+	i?: boolean;
 }
 
 const testData: Data = {

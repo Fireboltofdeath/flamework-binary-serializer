@@ -13,5 +13,5 @@ export namespace DataType {
 	export type i16 = number & { _i16?: never };
 	export type i32 = number & { _i32?: never };
 
-	export type Packed = { _packed?: never };
+	export type Packed<T> = T & { _packed?: [T] };
 }
