@@ -1,6 +1,5 @@
 import { FindDiscriminator, IsDiscriminableUnion, IsLiteralUnion, type IsUnion } from "./unions";
 import { HasRest, RestType, SplitRest } from "./tuples";
-import type { ExcludeBitFields, ExtractBitFields, RawType } from "./bitfields";
 
 type IsNumber<T, K extends string> = `_${K}` extends keyof T ? true : false;
 type HasNominal<T> = T extends T ? (T extends `_nominal_${string}` ? true : never) : never;
@@ -37,6 +36,8 @@ export type SerializerMetadata<T> = IsLiteralUnion<T> extends true
 	? ["literal", NonNullable<T>[], true extends IsUnion<T> ? (undefined extends T ? 1 : 0) : -1]
 	: unknown extends T
 	? ["optional", ["blob"]]
+	: [T] extends [{ _packed?: [infer V] }]
+	? ["packed", SerializerMetadata<V>]
 	: undefined extends T
 	? ["optional", SerializerMetadata<NonNullable<T>>]
 	: IsNumber<T, "f64"> extends true
@@ -83,8 +84,6 @@ export type SerializerMetadata<T> = IsLiteralUnion<T> extends true
 	  ]
 	: true extends HasNominal<keyof T>
 	? ["blob"]
-	: "_packed" extends keyof T
-	? ["packed", (keyof ExtractBitFields<T> & string)[], SerializerMetadata<ExcludeBitFields<RawType<T>>>, -1]
 	: T extends object
 	? [
 			"object_raw",
@@ -114,7 +113,7 @@ export type SerializerData =
 	| ["vector"]
 	| ["object", Array<string | SerializerData>, object]
 	| ["object_raw", [string, SerializerData][]]
-	| ["packed", string[], SerializerData, number]
+	| ["packed", SerializerData]
 	| ["union", string, [unknown, SerializerData][], number]
 	| ["array", SerializerData]
 	| ["tuple", SerializerData[], SerializerData | undefined]

@@ -1,12 +1,16 @@
 //!native
 //!optimize 2
 import type { SerializerData } from "../metadata";
+import type { ProcessedSerializerData } from "../processSerializerData";
 
-export function createDeserializer<T>(meta: SerializerData) {
+export function createDeserializer<T>(info: ProcessedSerializerData) {
+	const bits = table.create<boolean>(math.ceil(info.minimumPackedBits / 8) * 8);
+	let bitIndex = 0;
 	let buf!: buffer;
 	let offset!: number;
 	let blobs: defined[] | undefined;
 	let blobIndex = 0;
+	let packing = false;
 
 	function deserialize(meta: SerializerData): unknown {
 		const currentOffset = offset;
@@ -35,6 +39,9 @@ export function createDeserializer<T>(meta: SerializerData) {
 		} else if (kind === "i32") {
 			offset += 4;
 			return buffer.readi32(buf, currentOffset);
+		} else if (kind === "boolean" && packing) {
+			bitIndex++;
+			return bits[bitIndex - 1];
 		} else if (kind === "boolean") {
 			offset += 1;
 			return buffer.readu8(buf, currentOffset) === 1;
@@ -117,6 +124,9 @@ export function createDeserializer<T>(meta: SerializerData) {
 			}
 
 			return set;
+		} else if (kind === "optional" && packing) {
+			bitIndex++;
+			return bits[bitIndex - 1] ? deserialize(meta[1]) : undefined;
 		} else if (kind === "optional") {
 			offset += 1;
 			return buffer.readu8(buf, currentOffset) === 1 ? deserialize(meta[1]) : undefined;
@@ -146,25 +156,14 @@ export function createDeserializer<T>(meta: SerializerData) {
 			blobIndex++;
 			return blobs![blobIndex - 1];
 		} else if (kind === "packed") {
-			const bitfields = meta[1];
-			const objectType = meta[2];
-			const bytes = meta[3];
-			offset += bytes;
+			const innerType = meta[1];
+			const wasPacking = packing;
+			packing = true;
 
-			// We already moved the offset to the right, so we can do this to get access to an object to write to.
-			const object = deserialize(objectType);
-			const bitfieldCount = bitfields.size();
+			const value = deserialize(innerType);
+			packing = wasPacking;
 
-			for (const byte of $range(0, bytes - 1)) {
-				const currentByte = buffer.readu8(buf, currentOffset + byte);
-
-				for (const bit of $range(0, math.min(7, bitfieldCount - byte * 8 - 1))) {
-					const value = (currentByte >>> bit) % 2 === 1;
-					(object as Record<string, boolean>)[bitfields[bit + byte * 8]] = value;
-				}
-			}
-
-			return object;
+			return value;
 		} else if (kind === "cframe") {
 			offset += 4 * 6;
 
@@ -228,11 +227,44 @@ export function createDeserializer<T>(meta: SerializerData) {
 		}
 	}
 
+	function readBits() {
+		const guaranteedBytes = info.minimumPackedBytes;
+
+		while (true) {
+			const currentByte = buffer.readu8(buf, offset);
+			const guaranteedByte = offset < guaranteedBytes;
+
+			for (const bit of $range(guaranteedByte ? 0 : 1, 7)) {
+				const value = (currentByte >>> bit) % 2 === 1;
+				bits.push(value);
+			}
+
+			offset += 1;
+
+			// Variable bit indicated the end.
+			if (!guaranteedByte && currentByte % 2 === 0) {
+				break;
+			}
+
+			// We only have guaranteed bits and we reached the end.
+			if (!info.containsUnknownPacking && offset === guaranteedBytes) {
+				break;
+			}
+		}
+	}
+
 	return (input: buffer, inputBlobs?: defined[]) => {
 		blobs = inputBlobs;
 		buf = input;
 		offset = 0;
 		blobIndex = 0;
-		return deserialize(meta) as T;
+		bitIndex = 0;
+
+		if (info.containsPacking) {
+			table.clear(bits);
+			readBits();
+		}
+
+		return deserialize(info.data) as T;
 	};
 }

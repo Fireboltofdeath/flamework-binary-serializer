@@ -1,12 +1,15 @@
 //!native
 //!optimize 2
 import type { SerializerData } from "../metadata";
+import type { ProcessedSerializerData } from "../processSerializerData";
 
-export function createSerializer<T>(meta: SerializerData) {
+export function createSerializer<T>(info: ProcessedSerializerData) {
+	const bits = table.create<boolean>(info.minimumPackedBits);
 	let currentSize = 2 ** 8;
 	let buf = buffer.create(currentSize);
 	let offset!: number;
 	let blobs!: defined[];
+	let packing = false;
 
 	function allocate(size: number) {
 		offset += size;
@@ -48,6 +51,8 @@ export function createSerializer<T>(meta: SerializerData) {
 		} else if (kind === "i32") {
 			allocate(4);
 			buffer.writei32(buf, currentOffset, value as number);
+		} else if (kind === "boolean" && packing) {
+			bits.push(value as boolean);
 		} else if (kind === "boolean") {
 			allocate(1);
 			buffer.writeu8(buf, currentOffset, value === true ? 1 : 0);
@@ -119,6 +124,13 @@ export function createSerializer<T>(meta: SerializerData) {
 
 			// We already allocated this space before serializing the set, so this is safe.
 			buffer.writeu32(buf, currentOffset, size);
+		} else if (kind === "optional" && packing) {
+			if (value !== undefined) {
+				bits.push(true);
+				serialize(value, meta[1]);
+			} else {
+				bits.push(false);
+			}
 		} else if (kind === "optional") {
 			allocate(1);
 			if (value !== undefined) {
@@ -172,24 +184,12 @@ export function createSerializer<T>(meta: SerializerData) {
 			// Value will always be defined because if it isn't, it will be wrapped in `optional`
 			blobs.push(value!);
 		} else if (kind === "packed") {
-			const bitfields = meta[1];
-			const objectType = meta[2];
-			const bytes = meta[3];
-			allocate(bytes);
+			const innerType = meta[1];
+			const wasPacking = packing;
+			packing = true;
 
-			const bitfieldCount = bitfields.size();
-			for (const byte of $range(0, bytes - 1)) {
-				let currentByte = 0;
-
-				for (const bit of $range(0, math.min(7, bitfieldCount - byte * 8 - 1))) {
-					const field = (value as Record<string, boolean>)[bitfields[bit + byte * 8]];
-					currentByte += (field ? 1 : 0) << bit;
-				}
-
-				buffer.writeu8(buf, currentOffset + byte, currentByte);
-			}
-
-			serialize(value, objectType);
+			serialize(value, innerType);
+			packing = wasPacking;
 		} else if (kind === "cframe") {
 			allocate(4 * 6);
 
@@ -240,17 +240,65 @@ export function createSerializer<T>(meta: SerializerData) {
 		}
 	}
 
+	function writeBits(buf: buffer, offset: number, bitOffset: number, bytes: number, variable: boolean) {
+		const bitSize = bits.size();
+
+		for (const byte of $range(0, bytes - 1)) {
+			let currentByte = 0;
+
+			for (const bit of $range(variable ? 1 : 0, math.min(7, bitSize - bitOffset - 1))) {
+				currentByte += (bits[bitOffset] ? 1 : 0) << bit;
+				bitOffset += 1;
+			}
+
+			if (variable && byte !== bytes - 1) {
+				currentByte += 1;
+			}
+
+			buffer.writeu8(buf, offset, currentByte);
+
+			offset += 1;
+		}
+	}
+
+	function calculatePackedBytes() {
+		const minimumBytes = info.minimumPackedBytes;
+
+		if (info.containsUnknownPacking) {
+			const variableBytes = math.max(1, math.ceil((bits.size() - minimumBytes * 8) / 7));
+			const totalByteCount = minimumBytes + variableBytes;
+
+			return $tuple(minimumBytes, variableBytes, totalByteCount);
+		}
+
+		return $tuple(minimumBytes, 0, minimumBytes);
+	}
+
 	return (value: T) => {
 		offset = 0;
 		blobs = [];
-		serialize(value, meta);
+		table.clear(bits);
+		serialize(value, info.data);
 
-		const trim = buffer.create(offset);
-		buffer.copy(trim, 0, buf, 0, offset);
+		if (info.containsPacking) {
+			const [minimumBytes, variableBytes, totalBytes] = calculatePackedBytes();
+			const trim = buffer.create(offset + totalBytes);
+			buffer.copy(trim, totalBytes, buf, 0, offset);
 
-		return {
-			buffer: trim,
-			blobs: blobs,
-		};
+			if (minimumBytes > 0) {
+				writeBits(trim, 0, 0, minimumBytes, false);
+			}
+
+			if (variableBytes > 0) {
+				writeBits(trim, minimumBytes, minimumBytes * 8, variableBytes, true);
+			}
+
+			return { buffer: trim, blobs };
+		} else {
+			const trim = buffer.create(offset);
+			buffer.copy(trim, 0, buf, 0, offset);
+
+			return { buffer: trim, blobs };
+		}
 	};
 }
