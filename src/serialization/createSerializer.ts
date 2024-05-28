@@ -1,5 +1,6 @@
 //!native
 //!optimize 2
+import { AXIS_ALIGNED_ORIENTATIONS } from "../constants";
 import type { SerializerData } from "../metadata";
 import type { ProcessedSerializerData } from "../processSerializerData";
 
@@ -190,6 +191,56 @@ export function createSerializer<T>(info: ProcessedSerializerData) {
 
 			serialize(value, innerType);
 			packing = wasPacking;
+		} else if (kind === "cframe" && packing) {
+			// 1-5: Orientation, 6-7: Position, 8: unused
+			let optimizedPosition = false;
+			let optimizedRotation = false;
+			let packed = 0;
+
+			const cframe = value as CFrame;
+
+			if (cframe.Position === Vector3.zero) {
+				optimizedPosition = true;
+				packed += 0x20;
+			} else if (cframe.Position === Vector3.one) {
+				optimizedPosition = true;
+				packed += 0x20;
+				packed += 0x40;
+			}
+
+			const specialCase = AXIS_ALIGNED_ORIENTATIONS.indexOf(cframe.Rotation);
+			if (specialCase !== -1) {
+				optimizedRotation = true;
+				packed += specialCase;
+			} else {
+				packed += 0x1f;
+			}
+
+			const optimized = optimizedPosition || optimizedRotation;
+			bits.push(optimized);
+
+			allocate((optimized ? 1 : 0) + (optimizedPosition ? 0 : 12) + (optimizedRotation ? 0 : 12));
+
+			let newOffset = currentOffset;
+
+			if (optimized) {
+				buffer.writeu8(buf, newOffset, packed);
+				newOffset += 1;
+			}
+
+			if (!optimizedPosition) {
+				buffer.writef32(buf, newOffset, cframe.X);
+				buffer.writef32(buf, newOffset + 4, cframe.Y);
+				buffer.writef32(buf, newOffset + 8, cframe.Z);
+				newOffset += 12;
+			}
+
+			if (!optimizedRotation) {
+				const [axis, angle] = cframe.ToAxisAngle();
+				buffer.writef32(buf, newOffset, axis.X * angle);
+				buffer.writef32(buf, newOffset + 4, axis.Y * angle);
+				buffer.writef32(buf, newOffset + 8, axis.Z * angle);
+			}
 		} else if (kind === "cframe") {
 			allocate(4 * 6);
 

@@ -1,5 +1,6 @@
 //!native
 //!optimize 2
+import { AXIS_ALIGNED_ORIENTATIONS } from "../constants";
 import type { SerializerData } from "../metadata";
 import type { ProcessedSerializerData } from "../processSerializerData";
 
@@ -164,24 +165,50 @@ export function createDeserializer<T>(info: ProcessedSerializerData) {
 			packing = wasPacking;
 
 			return value;
+		} else if (kind === "cframe" && packing) {
+			bitIndex++;
+
+			// This is an unoptimized CFrame.
+			if (!bits[bitIndex - 1]) {
+				return deserializeCFrame();
+			}
+
+			const packed = buffer.readu8(buf, currentOffset);
+			offset += 1;
+
+			const optimizedPosition = (packed & 0x20) !== 0;
+			const optimizedRotation = packed & 0x1f;
+
+			let position;
+			if (optimizedPosition) {
+				position = (packed & 0x40) === 0 ? Vector3.zero : Vector3.one;
+			} else {
+				position = new Vector3(
+					buffer.readf32(buf, offset),
+					buffer.readf32(buf, offset + 4),
+					buffer.readf32(buf, offset + 8),
+				);
+
+				offset += 12;
+			}
+
+			if (optimizedRotation !== 0x1f) {
+				return AXIS_ALIGNED_ORIENTATIONS[optimizedRotation].add(position);
+			} else {
+				const axisRotation = new Vector3(
+					buffer.readf32(buf, offset),
+					buffer.readf32(buf, offset + 4),
+					buffer.readf32(buf, offset + 8),
+				);
+
+				offset += 12;
+
+				return axisRotation.Magnitude === 0
+					? new CFrame(position)
+					: CFrame.fromAxisAngle(axisRotation.Unit, axisRotation.Magnitude).add(position);
+			}
 		} else if (kind === "cframe") {
-			offset += 4 * 6;
-
-			const position = new Vector3(
-				buffer.readf32(buf, currentOffset),
-				buffer.readf32(buf, currentOffset + 4),
-				buffer.readf32(buf, currentOffset + 8),
-			);
-
-			const rotation = new Vector3(
-				buffer.readf32(buf, currentOffset + 12),
-				buffer.readf32(buf, currentOffset + 16),
-				buffer.readf32(buf, currentOffset + 20),
-			);
-
-			return rotation.Magnitude === 0
-				? new CFrame(position)
-				: CFrame.fromAxisAngle(rotation.Unit, rotation.Magnitude).add(position);
+			return deserializeCFrame();
 		} else if (kind === "colorsequence") {
 			const keypointCount = buffer.readu8(buf, currentOffset);
 			const keypoints = new Array<ColorSequenceKeypoint>();
@@ -225,6 +252,27 @@ export function createDeserializer<T>(info: ProcessedSerializerData) {
 		} else {
 			error(`unexpected kind: ${kind}`);
 		}
+	}
+
+	function deserializeCFrame() {
+		const currentOffset = offset;
+		offset += 4 * 6;
+
+		const position = new Vector3(
+			buffer.readf32(buf, currentOffset),
+			buffer.readf32(buf, currentOffset + 4),
+			buffer.readf32(buf, currentOffset + 8),
+		);
+
+		const rotation = new Vector3(
+			buffer.readf32(buf, currentOffset + 12),
+			buffer.readf32(buf, currentOffset + 16),
+			buffer.readf32(buf, currentOffset + 20),
+		);
+
+		return rotation.Magnitude === 0
+			? new CFrame(position)
+			: CFrame.fromAxisAngle(rotation.Unit, rotation.Magnitude).add(position);
 	}
 
 	function readBits() {

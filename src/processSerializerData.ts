@@ -98,6 +98,8 @@ function iterateSerializerData(data: SerializerData, info: ProcessedInfo): Seria
 		data = [kind, iterateSerializerData(data[1], info)];
 	} else if (kind === "boolean") {
 		addPackedBit(info);
+	} else if (kind === "cframe") {
+		addPackedBit(info);
 	}
 
 	info.flags = flags;
