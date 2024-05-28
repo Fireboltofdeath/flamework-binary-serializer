@@ -180,10 +180,10 @@ export function createDeserializer<T>(info: ProcessedSerializerData) {
 			const optimizedRotation = packed & 0x1f;
 
 			let position;
-			if (optimizedPosition === 0x60) {
-				position = Vector3.one;
-			} else if (optimizedPosition === 0x20) {
+			if (optimizedPosition === 0x20) {
 				position = Vector3.zero;
+			} else if (optimizedPosition === 0x60) {
+				position = Vector3.one;
 			} else {
 				position = new Vector3(
 					buffer.readf32(buf, offset),
