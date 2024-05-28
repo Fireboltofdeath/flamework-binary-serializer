@@ -205,9 +205,11 @@ export function createDeserializer<T>(info: ProcessedSerializerData) {
 
 				offset += 12;
 
-				return axisRotation.Magnitude === 0
-					? new CFrame(position)
-					: CFrame.fromAxisAngle(axisRotation.Unit, axisRotation.Magnitude).add(position);
+				if (axisRotation.Magnitude === 0) {
+					return new CFrame(position);
+				}
+
+				return CFrame.fromAxisAngle(axisRotation.Unit, axisRotation.Magnitude).add(position);
 			}
 		} else if (kind === "cframe") {
 			return deserializeCFrame();
