@@ -246,7 +246,7 @@ export function createSerializer<T>(info: ProcessedSerializerData) {
 		for (const byte of $range(0, bytes - 1)) {
 			let currentByte = 0;
 
-			for (const bit of $range(variable ? 1 : 0, math.min(7, bitSize - bitOffset - 1))) {
+			for (const bit of $range(variable ? 1 : 0, math.min(7, bitSize - bitOffset))) {
 				currentByte += (bits[bitOffset] ? 1 : 0) << bit;
 				bitOffset += 1;
 			}
