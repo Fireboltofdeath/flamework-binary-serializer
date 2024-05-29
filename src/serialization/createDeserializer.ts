@@ -133,8 +133,18 @@ export function createDeserializer<T>(info: ProcessedSerializerData) {
 			return buffer.readu8(buf, currentOffset) === 1 ? deserialize(meta[1]) : undefined;
 		} else if (kind === "union") {
 			const byteSize = meta[3];
-			const tagIndex = byteSize === 1 ? buffer.readu8(buf, currentOffset) : buffer.readu16(buf, currentOffset);
-			offset += byteSize;
+
+			let tagIndex;
+			if (byteSize === 1) {
+				offset += 1;
+				tagIndex = buffer.readu8(buf, currentOffset);
+			} else if (byteSize === 2) {
+				offset += 2;
+				tagIndex = buffer.readu16(buf, currentOffset);
+			} else {
+				bitIndex++;
+				tagIndex = bits[bitIndex - 1] ? 0 : 1;
+			}
 
 			const tag = meta[2][tagIndex];
 			const object = deserialize(tag[1]);

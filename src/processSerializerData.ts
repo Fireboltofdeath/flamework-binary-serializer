@@ -63,13 +63,20 @@ function iterateSerializerData(data: SerializerData, info: ProcessedInfo): Seria
 
 		data = [kind, iterateSerializerData(data[1], info)];
 	} else if (kind === "union") {
+		// Whenever we only have two options, we can use a single bit.
+		// We use a byte size of `-1` to indicate a packable union.
+		const isPackable = (info.flags & IterationFlags.Packed) !== 0 && data[2].size() === 2;
+		if (isPackable) {
+			addPackedBit(info);
+		}
+
 		info.flags |= IterationFlags.SizeUnknown;
 
 		data = [
 			kind,
 			data[1],
 			data[2].map(([key, data]): [unknown, SerializerData] => [key, iterateSerializerData(data, info)]),
-			data[2].size() <= 256 ? 1 : 2,
+			isPackable ? -1 : data[2].size() <= 256 ? 1 : 2,
 		];
 	} else if (kind === "map") {
 		info.flags |= IterationFlags.SizeUnknown;
