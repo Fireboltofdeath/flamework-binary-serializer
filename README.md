@@ -33,6 +33,7 @@ export interface Data {
 	color3: Color3;
 	colorSequence: ColorSequence;
 	numberSequence: NumberSequence;
+	enum: Enum.KeyCode;
 
 	boolean: boolean;
 	string: string;
@@ -63,6 +64,11 @@ export interface Data {
 //
 // Packing also optimizes `optional` values by using a single bit for the presence of the value.
 // Packing recursively applies to the entire object, including things like arrays, other objects, etc.
+//
+// Packing additionally optimizes CFrames by optimizing out axis-aligned orientation or default positions.
+// This does add an extra bit of overhead per CFrame, but due to the size of an unoptimized CFrame, this is insignificant.
+//
+// Packing also optimizes discriminated and literal unions with two constituents by using a single bit for the discriminator.
 interface PackedObject {
 	num: DataType.i8;
 	a: boolean;
@@ -103,6 +109,7 @@ const testData: Data = {
 		new NumberSequenceKeypoint(0.5, 1.75),
 		new NumberSequenceKeypoint(1, 250),
 	]),
+	enum: Enum.KeyCode.W,
 
 	boolean: true,
 	string: "hello i am a string!",
