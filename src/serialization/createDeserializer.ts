@@ -178,6 +178,11 @@ export function createDeserializer<T>(info: ProcessedSerializerData) {
 			packing = wasPacking;
 
 			return value;
+		} else if (kind === "enum") {
+			const index = buffer.readu8(buf, currentOffset);
+			offset += 1;
+
+			return info.sortedEnums[meta[1]][index];
 		} else if (kind === "cframe" && packing) {
 			bitIndex++;
 

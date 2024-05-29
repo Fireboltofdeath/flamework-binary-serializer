@@ -4,6 +4,8 @@ import { HasRest, RestType, SplitRest } from "./tuples";
 type IsNumber<T, K extends string> = `_${K}` extends keyof T ? true : false;
 type HasNominal<T> = T extends T ? (T extends `_nominal_${string}` ? true : never) : never;
 
+type GetEnumType<T> = [T] extends [EnumItem] ? ExtractKeys<Enums, T["EnumType"]> : never;
+
 /**
  * Generates the metadata for arrays and tuples.
  */
@@ -64,6 +66,8 @@ export type SerializerMetadata<T> = IsLiteralUnion<T> extends true
 	? ["string"]
 	: [T] extends [Vector3]
 	? ["vector"]
+	: [T] extends [EnumItem]
+	? ["enum", GetEnumType<T>]
 	: [T] extends [DataTypes[keyof DataTypes]]
 	? [ExtractKeys<DataTypes, T>]
 	: [T] extends [unknown[]]
@@ -122,4 +126,5 @@ export type SerializerData =
 	| ["optional", SerializerData]
 	| ["literal", defined[], number]
 	| ["blob"]
+	| ["enum", string]
 	| { [k in keyof DataTypes]: [k] }[keyof DataTypes];

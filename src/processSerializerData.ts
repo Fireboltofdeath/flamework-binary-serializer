@@ -1,3 +1,4 @@
+import { getSortedEnumItems } from "./constants";
 import type { SerializerData } from "./metadata";
 
 const enum IterationFlags {
@@ -12,6 +13,7 @@ export interface ProcessedInfo {
 	containsUnknownPacking: boolean;
 	minimumPackedBits: number;
 	minimumPackedBytes: number;
+	sortedEnums: Record<string, EnumItem[]>;
 }
 
 export interface ProcessedSerializerData extends ProcessedInfo {
@@ -117,6 +119,11 @@ function iterateSerializerData(data: SerializerData, info: ProcessedInfo): Seria
 		addPackedBit(info);
 	} else if (kind === "cframe") {
 		addPackedBit(info);
+	} else if (kind === "enum") {
+		// Calculate the sorted enum items so that we can send a single byte for an enum.
+		if (info.sortedEnums[data[1]] === undefined) {
+			info.sortedEnums[data[1]] = getSortedEnumItems(Enum[data[1] as never]);
+		}
 	}
 
 	info.flags = flags;
@@ -136,6 +143,7 @@ export function processSerializerData(rawData: SerializerData): ProcessedSeriali
 		containsUnknownPacking: false,
 		minimumPackedBits: 0,
 		minimumPackedBytes: 0,
+		sortedEnums: {},
 	};
 
 	processedInfo.data = iterateSerializerData(rawData, processedInfo);
