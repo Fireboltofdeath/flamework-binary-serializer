@@ -196,6 +196,11 @@ export function createSerializer<T>(info: ProcessedSerializerData) {
 
 			serialize(value, innerType);
 			packing = wasPacking;
+		} else if (kind === "enum") {
+			const enumIndex = info.sortedEnums[meta[1]].indexOf(value as EnumItem);
+			allocate(1);
+
+			buffer.writeu8(buf, currentOffset, enumIndex);
 		} else if (kind === "cframe" && packing) {
 			// 1-5: Orientation, 6-7: Position, 8: unused
 			let optimizedPosition = false;
