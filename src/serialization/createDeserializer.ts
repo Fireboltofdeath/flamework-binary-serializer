@@ -150,6 +150,9 @@ export function createDeserializer<T>(info: ProcessedSerializerData) {
 			} else if (byteSize === 2) {
 				offset += 2;
 				return literals[buffer.readu16(buf, currentOffset)];
+			} else if (byteSize === -1) {
+				bitIndex++;
+				return bits[bitIndex - 1] ? literals[0] : literals[1];
 			} else {
 				return literals[0];
 			}

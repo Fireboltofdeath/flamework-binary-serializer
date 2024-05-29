@@ -180,6 +180,8 @@ export function createSerializer<T>(info: ProcessedSerializerData) {
 				allocate(2);
 
 				buffer.writeu16(buf, currentOffset, index);
+			} else if (byteSize === -1) {
+				bits.push(value === literals[0]);
 			}
 		} else if (kind === "blob") {
 			// Value will always be defined because if it isn't, it will be wrapped in `optional`

@@ -87,6 +87,16 @@ function iterateSerializerData(data: SerializerData, info: ProcessedInfo): Seria
 
 		data = [kind, fixedElements, restElement];
 	} else if (kind === "literal") {
+		// Whenever we only have two options, we can use a single bit.
+		// We exclude undefined using `data[2] === 0` as it complicates thing.
+		if ((info.flags & IterationFlags.Packed) !== 0 && data[1].size() === 2 && data[2] === 0) {
+			addPackedBit(info);
+
+			// We use `-1` as the size to signify that this union can be packed,
+			// as it's not a valid value otherwise.
+			return [kind, data[1], -1];
+		}
+
 		// Since `undefined` is not included in the size of `data[1]`,
 		// we add the existing value of `data[3]` (which is 1 if undefined is in the union) to `data[1]`
 		// to determine the final required size.
