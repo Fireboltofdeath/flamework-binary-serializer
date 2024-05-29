@@ -145,7 +145,6 @@ export function createSerializer<T>(info: ProcessedSerializerData) {
 			const tagged = meta[2];
 			const byteSize = meta[3];
 			const objectTag = (value as Map<unknown, unknown>).get(tagName);
-			allocate(byteSize);
 
 			let tagIndex = 0;
 			let tagMetadata!: SerializerData;
@@ -159,9 +158,13 @@ export function createSerializer<T>(info: ProcessedSerializerData) {
 			}
 
 			if (byteSize === 1) {
+				allocate(1);
 				buffer.writeu8(buf, currentOffset, tagIndex);
-			} else {
+			} else if (byteSize === 2) {
+				allocate(2);
 				buffer.writeu16(buf, currentOffset, tagIndex);
+			} else if (byteSize === -1) {
+				bits.push(tagIndex === 0);
 			}
 
 			serialize(value, tagMetadata);
@@ -180,6 +183,8 @@ export function createSerializer<T>(info: ProcessedSerializerData) {
 				allocate(2);
 
 				buffer.writeu16(buf, currentOffset, index);
+			} else if (byteSize === -1) {
+				bits.push(value === literals[0]);
 			}
 		} else if (kind === "blob") {
 			// Value will always be defined because if it isn't, it will be wrapped in `optional`
