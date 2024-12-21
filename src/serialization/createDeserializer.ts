@@ -234,15 +234,15 @@ export function createDeserializer<T>(info: ProcessedSerializerData) {
 		} else if (kind === "colorsequence") {
 			const keypointCount = buffer.readu8(buf, currentOffset);
 			const keypoints = new Array<ColorSequenceKeypoint>();
-			offset += 1 + keypointCount * 16;
+			offset += 1 + keypointCount * 7;
 
 			for (const i of $range(1, keypointCount)) {
-				const keypointOffset = currentOffset + 1 + 16 * (i - 1);
+				const keypointOffset = currentOffset + 1 + 7 * (i - 1);
 				const time = buffer.readf32(buf, keypointOffset);
-				const value = new Color3(
-					buffer.readf32(buf, keypointOffset + 4),
-					buffer.readf32(buf, keypointOffset + 8),
-					buffer.readf32(buf, keypointOffset + 12),
+				const value = Color3.fromRGB(
+					buffer.readu8(buf, keypointOffset + 4),
+					buffer.readu8(buf, keypointOffset + 5),
+					buffer.readu8(buf, keypointOffset + 6),
 				);
 
 				keypoints.push(new ColorSequenceKeypoint(time, value));
@@ -264,12 +264,12 @@ export function createDeserializer<T>(info: ProcessedSerializerData) {
 
 			return new NumberSequence(keypoints);
 		} else if (kind === "color3") {
-			offset += 12;
+			offset += 3;
 
-			return new Color3(
-				buffer.readf32(buf, currentOffset),
-				buffer.readf32(buf, currentOffset + 4),
-				buffer.readf32(buf, currentOffset + 8),
+			return Color3.fromRGB(
+				buffer.readu8(buf, currentOffset),
+				buffer.readu8(buf, currentOffset + 1),
+				buffer.readu8(buf, currentOffset + 2),
 			);
 		} else {
 			error(`unexpected kind: ${kind}`);

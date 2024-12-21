@@ -154,3 +154,13 @@ print(buffer.tostring(serialized.buffer));
 print("deserialized", serializer.deserialize(serialized.buffer, serialized.blobs));
 print("original value", testData);
 ```
+
+## Serialization Tradeoffs
+
+### CFrames
+
+CFrames must be orthonormalized to be sent through the binary serializer. If you have a non orthogonal CFrame, you should send the components and reconstruct it once received.
+
+### Color3
+
+Color3 values are serialized as three u8 values, which means that if you are not creating a Color3 with values that are on the RGB spectrum there may be a loss of precision. It also means that you cannnot have infinity, NaN or other large values inside the Color3.
