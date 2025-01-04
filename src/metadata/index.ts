@@ -38,7 +38,7 @@ export type SerializerMetadata<T> = IsLiteralUnion<T> extends true
 	? ["literal", NonNullable<T>[], true extends IsUnion<T> ? (undefined extends T ? 1 : 0) : -1]
 	: unknown extends T
 	? ["optional", ["blob"]]
-	: [T] extends [{ _packed?: [infer V] }]
+	: ["_packed", T] extends [keyof T, { _packed?: [infer V] }]
 	? ["packed", SerializerMetadata<V>]
 	: undefined extends T
 	? ["optional", SerializerMetadata<NonNullable<T>>]
