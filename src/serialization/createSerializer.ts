@@ -1,5 +1,6 @@
 //!native
 //!optimize 2
+
 import { AXIS_ALIGNED_ORIENTATIONS } from "../constants";
 import type { SerializerData } from "../metadata";
 import type { ProcessedSerializerData } from "../processSerializerData";
@@ -9,10 +10,10 @@ export function createSerializer<T>(info: ProcessedSerializerData) {
 	let currentSize = 2 ** 8;
 	let buf = buffer.create(currentSize);
 	let offset!: number;
-	let blobs!: defined[];
+	let blobs!: Array<defined>;
 	let packing = false;
 
-	function allocate(size: number) {
+	function allocate(size: number): void {
 		offset += size;
 
 		if (offset > currentSize) {
@@ -25,7 +26,7 @@ export function createSerializer<T>(info: ProcessedSerializerData) {
 		}
 	}
 
-	function serialize(value: unknown, meta: SerializerData) {
+	function serialize(value: unknown, meta: SerializerData): void {
 		const currentOffset = offset;
 		const kind = meta[0];
 		if (kind === "f32") {
@@ -69,38 +70,36 @@ export function createSerializer<T>(info: ProcessedSerializerData) {
 			buffer.writef32(buf, currentOffset + 8, (value as Vector3).Z);
 		} else if (kind === "object") {
 			const elements = meta[1];
-			for (const i of $range(1, elements.size(), 2)) {
-				serialize((value as Record<string, unknown>)[elements[i - 1] as string], elements[i] as SerializerData);
+			for (const index of $range(1, elements.size(), 2)) {
+				serialize(
+					(value as Record<string, unknown>)[elements[index - 1] as string],
+					elements[index] as SerializerData,
+				);
 			}
 		} else if (kind === "array") {
 			const serializer = meta[1];
 			allocate(4);
 
-			buffer.writeu32(buf, currentOffset, (value as unknown[]).size());
+			buffer.writeu32(buf, currentOffset, (value as Array<unknown>).size());
 
-			for (const element of value as unknown[]) {
-				serialize(element, serializer);
-			}
+			for (const element of value as Array<unknown>) serialize(element, serializer);
 		} else if (kind === "tuple") {
-			const elements = meta[1];
-			const restSerializer = meta[2];
-			const size = (value as unknown[]).size();
+			const [, elements, restSerializer] = meta;
+			const size = (value as Array<unknown>).size();
 
-			// We serialize the rest element length first so that the deserializer can allocate accordingly.
+			// We serialize the rest element length first so that the
+			// deserializer can allocate accordingly.
 			if (restSerializer) {
 				allocate(4);
 				buffer.writeu32(buf, currentOffset, size - elements.size());
 			}
 
-			for (const i of $range(1, size)) {
-				const serializer = elements[i - 1] ?? restSerializer;
-				if (serializer) {
-					serialize((value as unknown[])[i - 1], serializer);
-				}
+			for (const index of $range(1, size)) {
+				const serializer = elements[index - 1] ?? restSerializer;
+				if (serializer) serialize((value as Array<unknown>)[index - 1], serializer);
 			}
 		} else if (kind === "map") {
-			const keySerializer = meta[1];
-			const valueSerializer = meta[2];
+			const [, keySerializer, valueSerializer] = meta;
 			allocate(4);
 
 			let size = 0;
@@ -110,10 +109,12 @@ export function createSerializer<T>(info: ProcessedSerializerData) {
 				serialize(elementValue, valueSerializer);
 			}
 
-			// We already allocated this space before serializing the map, so this is safe.
+			// We already allocated this space before serializing the map, so
+			// this is safe.
 			buffer.writeu32(buf, currentOffset, size);
 		} else if (kind === "set") {
-			// We could just generate `Map<V, true>` for sets, but this is more efficient as it omits serializing a boolean per value.
+			// We could just generate `Map<V, true>` for sets, but this is more
+			// efficient as it omits serializing a boolean per value.
 			const valueSerializer = meta[1];
 			allocate(4);
 
@@ -123,35 +124,30 @@ export function createSerializer<T>(info: ProcessedSerializerData) {
 				serialize(elementValue, valueSerializer);
 			}
 
-			// We already allocated this space before serializing the set, so this is safe.
+			// We already allocated this space before serializing the set, so
+			// this is safe.
 			buffer.writeu32(buf, currentOffset, size);
 		} else if (kind === "optional" && packing) {
 			if (value !== undefined) {
 				bits.push(true);
 				serialize(value, meta[1]);
-			} else {
-				bits.push(false);
-			}
+			} else bits.push(false);
 		} else if (kind === "optional") {
 			allocate(1);
 			if (value !== undefined) {
 				buffer.writeu8(buf, currentOffset, 1);
 				serialize(value, meta[1]);
-			} else {
-				buffer.writeu8(buf, currentOffset, 0);
-			}
+			} else buffer.writeu8(buf, currentOffset, 0);
 		} else if (kind === "union") {
-			const tagName = meta[1];
-			const tagged = meta[2];
-			const byteSize = meta[3];
+			const [, tagName, tagged, byteSize] = meta;
 			const objectTag = (value as Map<unknown, unknown>).get(tagName);
 
 			let tagIndex = 0;
 			let tagMetadata!: SerializerData;
-			for (const i of $range(1, tagged.size())) {
-				const tagObject = tagged[i - 1];
+			for (const index of $range(1, tagged.size())) {
+				const tagObject = tagged[index - 1];
 				if (tagObject[0] === objectTag) {
-					tagIndex = i - 1;
+					tagIndex = index - 1;
 					tagMetadata = tagObject[1];
 					break;
 				}
@@ -163,29 +159,24 @@ export function createSerializer<T>(info: ProcessedSerializerData) {
 			} else if (byteSize === 2) {
 				allocate(2);
 				buffer.writeu16(buf, currentOffset, tagIndex);
-			} else if (byteSize === -1) {
-				bits.push(tagIndex === 0);
-			}
+			} else if (byteSize === -1) bits.push(tagIndex === 0);
 
 			serialize(value, tagMetadata);
 		} else if (kind === "literal") {
-			// We support `undefined` as a literal, but `indexOf` will actually return -1
-			// This is fine, though, as -1 will serialize as the max integer which will be undefined on unions that do not exceed the size limit.
-			const literals = meta[1];
-			const byteSize = meta[2];
+			// We support `undefined` as a literal, but `indexOf` will actually
+			// return -1 This is fine, though, as -1 will serialize as the max
+			// integer which will be undefined on unions that do not exceed the
+			// size limit.
+			const [, literals, byteSize] = meta;
 			if (byteSize === 1) {
 				const index = literals.indexOf(value as defined);
 				allocate(1);
-
 				buffer.writeu8(buf, currentOffset, index);
 			} else if (byteSize === 2) {
 				const index = literals.indexOf(value as defined);
 				allocate(2);
-
 				buffer.writeu16(buf, currentOffset, index);
-			} else if (byteSize === -1) {
-				bits.push(value === literals[0]);
-			}
+			} else if (byteSize === -1) bits.push(value === literals[0]);
 		} else if (kind === "mixed_union") {
 			const [primitiveMetadata, objectMetadata] = meta[1];
 
@@ -202,7 +193,8 @@ export function createSerializer<T>(info: ProcessedSerializerData) {
 				serialize(value, primitiveMetadata);
 			}
 		} else if (kind === "blob") {
-			// Value will always be defined because if it isn't, it will be wrapped in `optional`
+			// Value will always be defined because if it isn't, it will be
+			// wrapped in `optional`
 			blobs.push(value!);
 		} else if (kind === "packed") {
 			const innerType = meta[1];
@@ -237,9 +229,7 @@ export function createSerializer<T>(info: ProcessedSerializerData) {
 			if (specialCase !== -1) {
 				optimizedRotation = true;
 				packed += specialCase;
-			} else {
-				packed += 0x1f;
-			}
+			} else packed += 0x1f;
 
 			const optimized = optimizedPosition || optimizedRotation;
 			bits.push(optimized);
@@ -284,9 +274,9 @@ export function createSerializer<T>(info: ProcessedSerializerData) {
 
 			buffer.writeu8(buf, currentOffset, keypointCount);
 
-			for (const i of $range(1, keypointCount)) {
-				const keypointOffset = currentOffset + 1 + 7 * (i - 1);
-				const keypoint = keypoints[i - 1];
+			for (const index of $range(1, keypointCount)) {
+				const keypointOffset = currentOffset + 1 + 7 * (index - 1);
+				const keypoint = keypoints[index - 1];
 				buffer.writef32(buf, keypointOffset, keypoint.Time);
 				buffer.writeu8(buf, keypointOffset + 4, keypoint.Value.R * 255);
 				buffer.writeu8(buf, keypointOffset + 5, keypoint.Value.G * 255);
@@ -299,9 +289,9 @@ export function createSerializer<T>(info: ProcessedSerializerData) {
 
 			buffer.writeu8(buf, currentOffset, keypointCount);
 
-			for (const i of $range(1, keypointCount)) {
-				const keypointOffset = currentOffset + 1 + 8 * (i - 1);
-				const keypoint = keypoints[i - 1];
+			for (const index of $range(1, keypointCount)) {
+				const keypointOffset = currentOffset + 1 + 8 * (index - 1);
+				const keypoint = keypoints[index - 1];
 				buffer.writef32(buf, keypointOffset, keypoint.Time);
 				buffer.writef32(buf, keypointOffset + 4, keypoint.Value);
 			}
@@ -311,12 +301,16 @@ export function createSerializer<T>(info: ProcessedSerializerData) {
 			buffer.writeu8(buf, currentOffset, (value as Color3).R * 255);
 			buffer.writeu8(buf, currentOffset + 1, (value as Color3).G * 255);
 			buffer.writeu8(buf, currentOffset + 2, (value as Color3).B * 255);
-		} else {
-			error(`unexpected kind: ${kind}`);
-		}
+		} else error(`unexpected kind: ${kind}`);
 	}
 
-	function writeBits(buf: buffer, offset: number, bitOffset: number, bytes: number, variable: boolean) {
+	function writeBits(
+		bitsBuffer: buffer,
+		bitsOffset: number,
+		bitOffset: number,
+		bytes: number,
+		variable: boolean,
+	): void {
 		const bitSize = bits.size();
 
 		for (const byte of $range(0, bytes - 1)) {
@@ -327,17 +321,13 @@ export function createSerializer<T>(info: ProcessedSerializerData) {
 				bitOffset += 1;
 			}
 
-			if (variable && byte !== bytes - 1) {
-				currentByte += 1;
-			}
-
-			buffer.writeu8(buf, offset, currentByte);
-
-			offset += 1;
+			if (variable && byte !== bytes - 1) currentByte += 1;
+			buffer.writeu8(bitsBuffer, bitsOffset, currentByte);
+			bitsOffset += 1;
 		}
 	}
 
-	function calculatePackedBytes() {
+	function calculatePackedBytes(): LuaTuple<[number, number, number]> {
 		const minimumBytes = info.minimumPackedBytes;
 
 		if (info.containsUnknownPacking) {
@@ -361,20 +351,14 @@ export function createSerializer<T>(info: ProcessedSerializerData) {
 			const trim = buffer.create(offset + totalBytes);
 			buffer.copy(trim, totalBytes, buf, 0, offset);
 
-			if (minimumBytes > 0) {
-				writeBits(trim, 0, 0, minimumBytes, false);
-			}
-
-			if (variableBytes > 0) {
-				writeBits(trim, minimumBytes, minimumBytes * 8, variableBytes, true);
-			}
-
-			return { buffer: trim, blobs };
-		} else {
-			const trim = buffer.create(offset);
-			buffer.copy(trim, 0, buf, 0, offset);
-
-			return { buffer: trim, blobs };
+			if (minimumBytes > 0) writeBits(trim, 0, 0, minimumBytes, false);
+			if (variableBytes > 0) writeBits(trim, minimumBytes, minimumBytes * 8, variableBytes, true);
+			return { blobs, buffer: trim };
 		}
+
+		const trim = buffer.create(offset);
+		buffer.copy(trim, 0, buf, 0, offset);
+
+		return { blobs, buffer: trim };
 	};
 }

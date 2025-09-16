@@ -1,5 +1,6 @@
 /**
- * This namespace includes additional types that can be used in the binary serializer.
+ * This namespace includes additional types that can be used in the binary
+ * serializer.
  */
 export namespace DataType {
 	export type f32 = number & { _f32?: never };

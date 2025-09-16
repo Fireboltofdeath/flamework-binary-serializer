@@ -1,15 +1,18 @@
 //!native
 //!optimize 2
+
 import { AXIS_ALIGNED_ORIENTATIONS } from "../constants";
 import type { SerializerData } from "../metadata";
 import type { ProcessedSerializerData } from "../processSerializerData";
 
-export function createDeserializer<T>(info: ProcessedSerializerData) {
+export function createDeserializer<T>(
+	info: ProcessedSerializerData,
+): (input: buffer, inputBlobs?: Array<defined>) => T {
 	const bits = table.create<boolean>(math.ceil(info.minimumPackedBits / 8) * 8);
 	let bitIndex = 0;
 	let buf!: buffer;
 	let offset!: number;
-	let blobs: defined[] | undefined;
+	let blobs: Array<defined> | undefined;
 	let blobIndex = 0;
 	let packing = false;
 
@@ -19,39 +22,50 @@ export function createDeserializer<T>(info: ProcessedSerializerData) {
 		if (kind === "f32") {
 			offset += 4;
 			return buffer.readf32(buf, currentOffset);
-		} else if (kind === "f64") {
+		}
+		if (kind === "f64") {
 			offset += 8;
 			return buffer.readf64(buf, currentOffset);
-		} else if (kind === "u8") {
+		}
+		if (kind === "u8") {
 			offset += 1;
 			return buffer.readu8(buf, currentOffset);
-		} else if (kind === "u16") {
+		}
+		if (kind === "u16") {
 			offset += 2;
 			return buffer.readu16(buf, currentOffset);
-		} else if (kind === "u32") {
+		}
+		if (kind === "u32") {
 			offset += 4;
 			return buffer.readu32(buf, currentOffset);
-		} else if (kind === "i8") {
+		}
+		if (kind === "i8") {
 			offset += 1;
 			return buffer.readi8(buf, currentOffset);
-		} else if (kind === "i16") {
+		}
+		if (kind === "i16") {
 			offset += 2;
 			return buffer.readi16(buf, currentOffset);
-		} else if (kind === "i32") {
+		}
+		if (kind === "i32") {
 			offset += 4;
 			return buffer.readi32(buf, currentOffset);
-		} else if (kind === "boolean" && packing) {
-			bitIndex++;
+		}
+		if (kind === "boolean" && packing) {
+			bitIndex += 1;
 			return bits[bitIndex - 1];
-		} else if (kind === "boolean") {
+		}
+		if (kind === "boolean") {
 			offset += 1;
 			return buffer.readu8(buf, currentOffset) === 1;
-		} else if (kind === "string") {
+		}
+		if (kind === "string") {
 			const length = buffer.readu32(buf, currentOffset);
 			offset += 4 + length;
 
 			return buffer.readstring(buf, currentOffset + 4, length);
-		} else if (kind === "vector") {
+		}
+		if (kind === "vector") {
 			offset += 12;
 
 			return new Vector3(
@@ -59,29 +73,30 @@ export function createDeserializer<T>(info: ProcessedSerializerData) {
 				buffer.readf32(buf, currentOffset + 4),
 				buffer.readf32(buf, currentOffset + 8),
 			);
-		} else if (kind === "object") {
+		}
+		if (kind === "object") {
 			const elements = meta[1];
-			const obj = table.clone(meta[2]) as Map<unknown, unknown>;
-			for (const i of $range(1, elements.size(), 2)) {
-				(obj as never as Record<string, unknown>)[elements[i - 1] as string] = deserialize(
-					elements[i] as SerializerData,
+			const object = table.clone(meta[2]) as Map<unknown, unknown>;
+			for (const index of $range(1, elements.size(), 2)) {
+				(object as never as Record<string, unknown>)[elements[index - 1] as string] = deserialize(
+					elements[index] as SerializerData,
 				);
 			}
-			return obj;
-		} else if (kind === "array") {
+			return object;
+		}
+		if (kind === "array") {
 			const deserializer = meta[1];
 			const length = buffer.readu32(buf, currentOffset);
 			const array = new Array<defined>(length);
 			offset += 4;
 
-			for (const i of $range(1, length)) {
-				array.push(deserialize(deserializer)!);
-			}
+			// eslint-disable-next-line shopify/prefer-module-scope-constants -- not one.
+			for (const _ of $range(1, length)) array.push(deserialize(deserializer)!);
 
 			return array;
-		} else if (kind === "tuple") {
-			const elements = meta[1];
-			const restDeserializer = meta[2];
+		}
+		if (kind === "tuple") {
+			const [, elements, restDeserializer] = meta;
 
 			let restLength = 0;
 			if (restDeserializer) {
@@ -91,47 +106,45 @@ export function createDeserializer<T>(info: ProcessedSerializerData) {
 
 			const tuple = new Array<defined>(elements.size() + restLength);
 
-			for (const element of elements) {
-				tuple.push(deserialize(element) as defined);
-			}
+			for (const element of elements) tuple.push(deserialize(element) as defined);
 
 			if (restDeserializer) {
-				for (const _ of $range(1, restLength)) {
-					tuple.push(deserialize(restDeserializer) as defined);
-				}
+				// eslint-disable-next-line shopify/prefer-module-scope-constants -- not one.
+				for (const _ of $range(1, restLength)) tuple.push(deserialize(restDeserializer) as defined);
 			}
 
 			return tuple;
-		} else if (kind === "map") {
-			const keyDeserializer = meta[1];
-			const valueDeserializer = meta[2];
+		}
+		if (kind === "map") {
+			const [, keyDeserializer, valueDeserializer] = meta;
 			const length = buffer.readu32(buf, currentOffset);
 			const map = new Map<unknown, unknown>();
 			offset += 4;
 
-			for (const i of $range(1, length)) {
-				map.set(deserialize(keyDeserializer), deserialize(valueDeserializer));
-			}
+			// eslint-disable-next-line shopify/prefer-module-scope-constants -- not one.
+			for (const _ of $range(1, length)) map.set(deserialize(keyDeserializer), deserialize(valueDeserializer));
 
 			return map;
-		} else if (kind === "set") {
+		}
+		if (kind === "set") {
 			const valueDeserializer = meta[1];
 			const length = buffer.readu32(buf, currentOffset);
 			const set = new Set<unknown>();
 			offset += 4;
 
-			for (const i of $range(1, length)) {
-				set.add(deserialize(valueDeserializer));
-			}
-
+			// eslint-disable-next-line shopify/prefer-module-scope-constants -- not one.
+			for (const _ of $range(1, length)) set.add(deserialize(valueDeserializer));
 			return set;
-		} else if (kind === "optional" && packing) {
-			bitIndex++;
+		}
+		if (kind === "optional" && packing) {
+			bitIndex += 1;
 			return bits[bitIndex - 1] ? deserialize(meta[1]) : undefined;
-		} else if (kind === "optional") {
+		}
+		if (kind === "optional") {
 			offset += 1;
 			return buffer.readu8(buf, currentOffset) === 1 ? deserialize(meta[1]) : undefined;
-		} else if (kind === "union") {
+		}
+		if (kind === "union") {
 			const byteSize = meta[3];
 
 			let tagIndex;
@@ -142,7 +155,7 @@ export function createDeserializer<T>(info: ProcessedSerializerData) {
 				offset += 2;
 				tagIndex = buffer.readu16(buf, currentOffset);
 			} else {
-				bitIndex++;
+				bitIndex += 1;
 				tagIndex = bits[bitIndex - 1] ? 0 : 1;
 			}
 
@@ -151,39 +164,41 @@ export function createDeserializer<T>(info: ProcessedSerializerData) {
 			(object as Record<string, unknown>)[meta[1]] = tag[0];
 
 			return object;
-		} else if (kind === "literal") {
-			const literals = meta[1];
-			const byteSize = meta[2];
+		}
+		if (kind === "literal") {
+			const [, literals, byteSize] = meta;
 			if (byteSize === 1) {
 				offset += 1;
 				return literals[buffer.readu8(buf, currentOffset)];
-			} else if (byteSize === 2) {
+			}
+			if (byteSize === 2) {
 				offset += 2;
 				return literals[buffer.readu16(buf, currentOffset)];
-			} else if (byteSize === -1) {
-				bitIndex++;
-				return bits[bitIndex - 1] ? literals[0] : literals[1];
-			} else {
-				return literals[0];
 			}
-		} else if (kind === "mixed_union") {
+			if (byteSize === -1) {
+				bitIndex += 1;
+				return bits[bitIndex - 1] ? literals[0] : literals[1];
+			}
+			return literals[0];
+		}
+		if (kind === "mixed_union") {
 			const [primitiveMetadata, objectMetadata] = meta[1];
 
 			// Read type discriminator
 			const typeDiscriminator = buffer.readu8(buf, currentOffset);
 			offset += 1;
 
-			if (typeDiscriminator === 1) {
-				// Deserialize as object
-				return deserialize(objectMetadata);
-			} else {
-				// Deserialize as primitive
-				return deserialize(primitiveMetadata);
-			}
-		} else if (kind === "blob") {
-			blobIndex++;
+			// Deserialize as object
+			if (typeDiscriminator === 1) return deserialize(objectMetadata);
+
+			// Deserialize as primitive
+			return deserialize(primitiveMetadata);
+		}
+		if (kind === "blob") {
+			blobIndex += 1;
 			return blobs![blobIndex - 1];
-		} else if (kind === "packed") {
+		}
+		if (kind === "packed") {
 			const innerType = meta[1];
 			const wasPacking = packing;
 			packing = true;
@@ -192,18 +207,18 @@ export function createDeserializer<T>(info: ProcessedSerializerData) {
 			packing = wasPacking;
 
 			return value;
-		} else if (kind === "enum") {
+		}
+		if (kind === "enum") {
 			const index = buffer.readu8(buf, currentOffset);
 			offset += 1;
 
 			return info.sortedEnums[meta[1]][index];
-		} else if (kind === "cframe" && packing) {
-			bitIndex++;
+		}
+		if (kind === "cframe" && packing) {
+			bitIndex += 1;
 
 			// This is an unoptimized CFrame.
-			if (!bits[bitIndex - 1]) {
-				return deserializeCFrame();
-			}
+			if (!bits[bitIndex - 1]) return deserializeCFrame();
 
 			const packed = buffer.readu8(buf, currentOffset);
 			offset += 1;
@@ -212,11 +227,9 @@ export function createDeserializer<T>(info: ProcessedSerializerData) {
 			const optimizedRotation = packed & 0x1f;
 
 			let position;
-			if (optimizedPosition === 0x20) {
-				position = Vector3.zero;
-			} else if (optimizedPosition === 0x60) {
-				position = Vector3.one;
-			} else {
+			if (optimizedPosition === 0x20) position = Vector3.zero;
+			else if (optimizedPosition === 0x60) position = Vector3.one;
+			else {
 				position = new Vector3(
 					buffer.readf32(buf, offset),
 					buffer.readf32(buf, offset + 4),
@@ -226,32 +239,29 @@ export function createDeserializer<T>(info: ProcessedSerializerData) {
 				offset += 12;
 			}
 
-			if (optimizedRotation !== 0x1f) {
-				return AXIS_ALIGNED_ORIENTATIONS[optimizedRotation].add(position);
-			} else {
-				const axisRotation = new Vector3(
-					buffer.readf32(buf, offset),
-					buffer.readf32(buf, offset + 4),
-					buffer.readf32(buf, offset + 8),
-				);
+			if (optimizedRotation !== 0x1f) return AXIS_ALIGNED_ORIENTATIONS[optimizedRotation].add(position);
 
-				offset += 12;
+			const axisRotation = new Vector3(
+				buffer.readf32(buf, offset),
+				buffer.readf32(buf, offset + 4),
+				buffer.readf32(buf, offset + 8),
+			);
 
-				if (axisRotation.Magnitude === 0) {
-					return new CFrame(position);
-				}
+			offset += 12;
 
-				return CFrame.fromAxisAngle(axisRotation.Unit, axisRotation.Magnitude).add(position);
-			}
-		} else if (kind === "cframe") {
-			return deserializeCFrame();
-		} else if (kind === "colorsequence") {
+			if (axisRotation.Magnitude === 0) return new CFrame(position);
+			return CFrame.fromAxisAngle(axisRotation.Unit, axisRotation.Magnitude).add(position);
+		}
+
+		if (kind === "cframe") return deserializeCFrame();
+
+		if (kind === "colorsequence") {
 			const keypointCount = buffer.readu8(buf, currentOffset);
 			const keypoints = new Array<ColorSequenceKeypoint>();
 			offset += 1 + keypointCount * 7;
 
-			for (const i of $range(1, keypointCount)) {
-				const keypointOffset = currentOffset + 1 + 7 * (i - 1);
+			for (const index of $range(1, keypointCount)) {
+				const keypointOffset = currentOffset + 1 + 7 * (index - 1);
 				const time = buffer.readf32(buf, keypointOffset);
 				const value = Color3.fromRGB(
 					buffer.readu8(buf, keypointOffset + 4),
@@ -263,13 +273,14 @@ export function createDeserializer<T>(info: ProcessedSerializerData) {
 			}
 
 			return new ColorSequence(keypoints);
-		} else if (kind === "numbersequence") {
+		}
+		if (kind === "numbersequence") {
 			const keypointCount = buffer.readu8(buf, currentOffset);
 			const keypoints = new Array<NumberSequenceKeypoint>();
 			offset += 1 + keypointCount * 8;
 
-			for (const i of $range(1, keypointCount)) {
-				const keypointOffset = currentOffset + 1 + 8 * (i - 1);
+			for (const index of $range(1, keypointCount)) {
+				const keypointOffset = currentOffset + 1 + 8 * (index - 1);
 				const time = buffer.readf32(buf, keypointOffset);
 				const value = buffer.readf32(buf, keypointOffset + 4);
 
@@ -277,7 +288,8 @@ export function createDeserializer<T>(info: ProcessedSerializerData) {
 			}
 
 			return new NumberSequence(keypoints);
-		} else if (kind === "color3") {
+		}
+		if (kind === "color3") {
 			offset += 3;
 
 			return Color3.fromRGB(
@@ -285,12 +297,11 @@ export function createDeserializer<T>(info: ProcessedSerializerData) {
 				buffer.readu8(buf, currentOffset + 1),
 				buffer.readu8(buf, currentOffset + 2),
 			);
-		} else {
-			error(`unexpected kind: ${kind}`);
 		}
+		error(`unexpected kind: ${kind}`);
 	}
 
-	function deserializeCFrame() {
+	function deserializeCFrame(): CFrame {
 		const currentOffset = offset;
 		offset += 4 * 6;
 
@@ -311,7 +322,7 @@ export function createDeserializer<T>(info: ProcessedSerializerData) {
 			: CFrame.fromAxisAngle(rotation.Unit, rotation.Magnitude).add(position);
 	}
 
-	function readBits() {
+	function readBits(): void {
 		const guaranteedBytes = info.minimumPackedBytes;
 
 		while (true) {
@@ -326,18 +337,14 @@ export function createDeserializer<T>(info: ProcessedSerializerData) {
 			offset += 1;
 
 			// Variable bit indicated the end.
-			if (!guaranteedByte && currentByte % 2 === 0) {
-				break;
-			}
+			if (!guaranteedByte && currentByte % 2 === 0) break;
 
 			// We only have guaranteed bits and we reached the end.
-			if (!info.containsUnknownPacking && offset === guaranteedBytes) {
-				break;
-			}
+			if (!info.containsUnknownPacking && offset === guaranteedBytes) break;
 		}
 	}
 
-	return (input: buffer, inputBlobs?: defined[]) => {
+	return (input: buffer, inputBlobs?: Array<defined>): T => {
 		blobs = inputBlobs;
 		buf = input;
 		offset = 0;

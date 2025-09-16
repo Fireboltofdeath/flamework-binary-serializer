@@ -1,4 +1,5 @@
-// This does not account for potential floating point drift but this is likely not an issue for axis aligned orientations.
+// This does not account for potential floating point drift but this is likely
+// not an issue for axis aligned orientations.
 export const AXIS_ALIGNED_ORIENTATIONS = [
 	[0, 0, 0],
 	[0, 180, 0],
@@ -29,10 +30,14 @@ export const AXIS_ALIGNED_ORIENTATIONS = [
 /**
  * Returns a consistently ordered array for a specific Enum.
  *
- * We can't send Enum values over the network as the values aren't always within the 8 bit limit,
- * so instead we send the EnumItem's position in the array returned here.
+ * We can't send Enum values over the network as the values aren't always
+ * within the 8 bit limit, so instead we send the EnumItem's position in the
+ * array returned here.
+ *
+ * @param enumObject - The Enum to list items for.
+ * @returns An array of EnumItem values sorted by their numeric Value.
  */
-export function getSortedEnumItems(enumObject: Enum) {
+export function getSortedEnumItems(enumObject: Enum): Array<EnumItem> {
 	const enumItems = enumObject.GetEnumItems();
 	enumItems.sort((a, b) => a.Value < b.Value);
 

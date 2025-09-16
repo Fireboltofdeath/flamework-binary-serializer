@@ -62,13 +62,8 @@ export default style(
 			"comment-length/limit-single-line-comments": "error",
 			"comment-length/limit-tagged-template-literal-comments": "error",
 			curly: "off",
-			"id-length": [
-				"error",
-				{
-					exceptionPatterns: ["_"],
-					max: 45,
-				},
-			],
+			"id-length": "off",
+			"sonar/no-nested-conditional": "off",
 			"max-lines": [
 				"warn",
 				{
@@ -177,7 +172,10 @@ export default style(
 			"ts/no-unnecessary-type-assertion": "off",
 			"new-cap": "off",
 			"roblox/misleading-lua-tuple-checks": "off",
-			"unicorn/filename-case": ["error", { case: "camelCase" }]
+			"unicorn/filename-case": ["error", { case: "camelCase" }],
+			"ts/no-unnecessary-type-parameters": "off",
+			"unicorn/prefer-switch": "off",
+			"better-max-params/better-max-params": "off",
 		},
 		spellCheck: false,
 		stylistic: {
@@ -198,4 +196,10 @@ export default style(
 			typeAware: true,
 		},
 	},
+	{
+		"files": ["src/dataType.ts"],
+		"rules": {
+			"unicorn/prevent-abbreviations": "off"
+		}
+	}
 );
