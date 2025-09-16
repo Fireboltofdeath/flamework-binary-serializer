@@ -10,5 +10,22 @@
 		"editor.formatOnSave": true
 	},
 	"eslint.run": "onType",
-	"eslint.format.enable": true
+	"eslint.format.enable": true,
+	"editor.codeActionsOnSave": {
+		"source.addMissingImports": "explicit",
+		"source.fixAll.eslint": "explicit",
+		"source.removeUnusedImports": "explicit",
+	},
+	"eslint.validate": [
+		"typescript",
+		"typescriptreact",
+		"markdown",
+		"json",
+		"jsonc",
+		"yaml",
+		"toml",
+		"luau",
+		"gitignore",
+		"snippets"
+	],
 }
