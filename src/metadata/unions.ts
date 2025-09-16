@@ -50,3 +50,33 @@ export type IsLiteralUnion<T> = [boolean, NonNullable<T>] extends [NonNullable<T
 	: (T extends T ? (T extends undefined ? true : IsLiteral<T> extends true ? true : false) : never) extends true
 	? true
 	: false;
+
+// Helper to detect if a union has both primitive and object types
+type UnionHasPrimitiveAndObject<T> = T extends T
+	? T extends string | number | boolean
+		? "primitive"
+		: T extends object
+			? "object"
+			: "other"
+	: never;
+
+// Check if this is a mixed primitive|object union
+export type IsNonDiscriminatedMixedUnion<T> = IsUnion<T> extends true
+	? IsDiscriminableUnion<T> extends false
+		? IsLiteralUnion<T> extends false
+			? UnionHasPrimitiveAndObject<T> extends infer U
+				? "primitive" extends U
+					? "object" extends U
+						? true
+						: false
+					: false
+				: false
+			: false
+		: false
+	: false;
+
+// Extract primitive branches from a union
+export type ExtractPrimitiveBranches<T> = T extends string | number | boolean | undefined | null ? T : never;
+
+// Extract object branches from a union (excluding primitive objects)
+export type ExtractObjectBranches<T> = T extends object ? (T extends string | number | boolean ? never : T) : never;

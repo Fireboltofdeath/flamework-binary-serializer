@@ -111,6 +111,12 @@ function iterateSerializerData(data: SerializerData, info: ProcessedInfo): Seria
 		// to determine the final required size.
 		// A size of -1 means this isn't a union.
 		data = [kind, data[1], data[2] === -1 ? 0 : data[2] + data[1].size() <= 256 ? 1 : 2];
+	} else if (kind === "mixed_union") {
+		const [primitiveMetadata, objectMetadata] = data[1];
+		data = [
+			kind,
+			[iterateSerializerData(primitiveMetadata, info), iterateSerializerData(objectMetadata, info)],
+		];
 	} else if (kind === "packed") {
 		info.flags |= IterationFlags.Packed;
 

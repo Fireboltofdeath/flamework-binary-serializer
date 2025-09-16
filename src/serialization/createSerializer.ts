@@ -186,6 +186,21 @@ export function createSerializer<T>(info: ProcessedSerializerData) {
 			} else if (byteSize === -1) {
 				bits.push(value === literals[0]);
 			}
+		} else if (kind === "mixed_union") {
+			const [primitiveMetadata, objectMetadata] = meta[1];
+
+			// Use typeof to determine if value is primitive or object
+			if (typeOf(value) === "table") {
+				// Serialize as object with type discriminator 1
+				allocate(1);
+				buffer.writeu8(buf, currentOffset, 1);
+				serialize(value, objectMetadata);
+			} else {
+				// Serialize as primitive with type discriminator 0
+				allocate(1);
+				buffer.writeu8(buf, currentOffset, 0);
+				serialize(value, primitiveMetadata);
+			}
 		} else if (kind === "blob") {
 			// Value will always be defined because if it isn't, it will be wrapped in `optional`
 			blobs.push(value!);

@@ -1,4 +1,4 @@
-import { FindDiscriminator, IsDiscriminableUnion, IsLiteralUnion, type IsUnion } from "./unions";
+import type { FindDiscriminator, IsDiscriminableUnion, IsLiteralUnion, IsUnion, IsNonDiscriminatedMixedUnion, ExtractPrimitiveBranches, ExtractObjectBranches } from "./unions";
 import { HasRest, RestType, SplitRest } from "./tuples";
 
 type IsNumber<T, K extends string> = `_${K}` extends keyof T ? true : false;
@@ -86,6 +86,11 @@ export type SerializerMetadata<T> = IsLiteralUnion<T> extends true
 			// This is the byte size length. This is annoying (and slow) to calculate in TS, so it's done at runtime.
 			-1,
 	  ]
+	: IsNonDiscriminatedMixedUnion<T> extends true
+	? [
+			"mixed_union",
+			[SerializerMetadata<ExtractPrimitiveBranches<T>>, SerializerMetadata<ExtractObjectBranches<T>>],
+	  ]
 	: true extends HasNominal<keyof T>
 	? ["blob"]
 	: T extends object
@@ -95,8 +100,14 @@ export type SerializerMetadata<T> = IsLiteralUnion<T> extends true
 				[k in keyof T]-?: [k, SerializerMetadata<T[k]>];
 			}[keyof T][],
 	  ]
+	: [T] extends [number]
+	? ["f64"]
+	: [T] extends [string]
+	? ["string"]
+	: [T] extends [boolean]
+	? ["boolean"]
 	: ["blob"];
-
+ 
 /**
  * This type is essentially a union of all possible values that `SerializerMetadata` can emit.
  *
@@ -127,4 +138,5 @@ export type SerializerData =
 	| ["literal", defined[], number]
 	| ["blob"]
 	| ["enum", string]
+	| ["mixed_union", [SerializerData, SerializerData]]
 	| { [k in keyof DataTypes]: [k] }[keyof DataTypes];

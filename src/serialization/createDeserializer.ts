@@ -166,6 +166,20 @@ export function createDeserializer<T>(info: ProcessedSerializerData) {
 			} else {
 				return literals[0];
 			}
+		} else if (kind === "mixed_union") {
+			const [primitiveMetadata, objectMetadata] = meta[1];
+
+			// Read type discriminator
+			const typeDiscriminator = buffer.readu8(buf, currentOffset);
+			offset += 1;
+
+			if (typeDiscriminator === 1) {
+				// Deserialize as object
+				return deserialize(objectMetadata);
+			} else {
+				// Deserialize as primitive
+				return deserialize(primitiveMetadata);
+			}
 		} else if (kind === "blob") {
 			blobIndex++;
 			return blobs![blobIndex - 1];
