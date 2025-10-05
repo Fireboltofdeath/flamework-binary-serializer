@@ -168,6 +168,30 @@ export function createSerializer<T>(info: ProcessedSerializerData) {
 			}
 
 			serialize(value, tagMetadata);
+		} else if (kind === "guard_union") {
+			const constituents = meta[1];
+
+			let serializerIndex: number | undefined;
+			let serializer!: SerializerData;
+			for (const i of $range(1, constituents.size())) {
+				// Flamework can't generate "any table" guards so it gets replaced with nil
+				const constituent = constituents[i - 1];
+				const guard = constituent[1];
+				if (guard ? guard(value) : typeIs(value, "table")) {
+					serializerIndex = i - 1;
+					serializer = constituent[0];
+				}
+			}
+
+			if (serializerIndex === undefined) {
+				error("the passed in value matches none of the generated guards");
+			}
+
+			// Supports 256 unions for the time being.
+			allocate(1);
+			buffer.writeu8(buf, currentOffset, serializerIndex);
+
+			serialize(value, serializer);
 		} else if (kind === "literal") {
 			// We support `undefined` as a literal, but `indexOf` will actually return -1
 			// This is fine, though, as -1 will serialize as the max integer which will be undefined on unions that do not exceed the size limit.

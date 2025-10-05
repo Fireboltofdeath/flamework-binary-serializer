@@ -1,8 +1,16 @@
-import { FindDiscriminator, IsDiscriminableUnion, IsLiteralUnion, type IsUnion } from "./unions";
+import {
+	FindDiscriminator,
+	HasNominal,
+	HasSingularObjectConstituent,
+	IsDiscriminableUnion,
+	IsLiteralUnion,
+	IsTableObject,
+	type IsUnion,
+} from "./unions";
 import { HasRest, RestType, SplitRest } from "./tuples";
+import { Modding } from "@flamework/core";
 
 type IsNumber<T, K extends string> = `_${K}` extends keyof T ? true : false;
-type HasNominal<T> = T extends T ? (T extends `_nominal_${string}` ? true : never) : never;
 
 type GetEnumType<T> = [T] extends [EnumItem] ? ExtractKeys<Enums, T["EnumType"]> : never;
 
@@ -86,6 +94,17 @@ export type SerializerMetadata<T> = IsLiteralUnion<T> extends true
 			// This is the byte size length. This is annoying (and slow) to calculate in TS, so it's done at runtime.
 			-1,
 	  ]
+	: IsUnion<T> extends true
+	? [
+			"guard_union",
+			(HasSingularObjectConstituent<T> extends infer U
+				? T extends T
+					? [IsTableObject<T>, U] extends [true, true]
+						? [SerializerMetadata<T>, undefined]
+						: [SerializerMetadata<T>, Modding.Generic<T, "guard">]
+					: never
+				: never)[],
+	  ]
 	: true extends HasNominal<keyof T>
 	? ["blob"]
 	: T extends object
@@ -119,6 +138,7 @@ export type SerializerData =
 	| ["object_raw", [string, SerializerData][]]
 	| ["packed", SerializerData]
 	| ["union", string, [unknown, SerializerData][], number]
+	| ["guard_union", (readonly [SerializerData, ((value: unknown) => boolean) | undefined])[]]
 	| ["array", SerializerData]
 	| ["tuple", SerializerData[], SerializerData | undefined]
 	| ["map", SerializerData, SerializerData]
