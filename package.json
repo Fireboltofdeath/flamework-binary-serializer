@@ -1,6 +1,6 @@
 {
 	"name": "@rbxts/flamework-binary-serializer",
-	"version": "0.6.0",
+	"version": "0.7.0",
 	"description": "",
 	"author": "Fireboltofdeath",
 	"main": "out/init.lua",
