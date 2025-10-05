@@ -151,6 +151,13 @@ export function createDeserializer<T>(info: ProcessedSerializerData) {
 			(object as Record<string, unknown>)[meta[1]] = tag[0];
 
 			return object;
+		} else if (kind === "guard_union") {
+			const serializers = meta[1];
+
+			const deserializer = serializers[buffer.readu8(buf, currentOffset)][0];
+			offset += 1;
+
+			return deserialize(deserializer);
 		} else if (kind === "literal") {
 			const literals = meta[1];
 			const byteSize = meta[2];

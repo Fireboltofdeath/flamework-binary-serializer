@@ -16,7 +16,8 @@ type IsLiteral<T> = T extends undefined
 	? true
 	: false;
 
-export type IsUnion<T, U = T> = T extends T ? (U extends T ? never : true) : never;
+export type HasNominal<T> = T extends T ? (T extends `_nominal_${string}` ? true : never) : never;
+export type IsUnion<T, U = T> = true extends (T extends T ? (U extends T ? never : true) : never) ? true : false;
 
 type NonUnionKeys<T> = { [k in keyof T]: true extends IsUnion<T[k]> ? never : k }[keyof T];
 type LiteralKeys<T> = { [k in keyof T]: true extends IsLiteral<T[k]> ? k : never }[keyof T];
@@ -50,3 +51,23 @@ export type IsLiteralUnion<T> = [boolean, NonNullable<T>] extends [NonNullable<T
 	: (T extends T ? (T extends undefined ? true : IsLiteral<T> extends true ? true : false) : never) extends true
 	? true
 	: false;
+
+export type IsTableObject<T> = T extends object
+	? true extends HasNominal<keyof T>
+		? false
+		: true extends IsLiteral<T>
+		? false
+		: T extends number | string | boolean
+		? false
+		: true
+	: false;
+
+// This checks that a union type does not have multiple object constituents,
+// excluding datatypes which have special guard generation.
+// This serves purely as an optimization as it avoids generating in-depth object guards
+// for objects that can be discriminated purely with `typeof`
+export type HasSingularObjectConstituent<T> = true extends IsUnion<
+	T extends T ? (IsTableObject<T> extends true ? T : never) : never
+>
+	? false
+	: true;

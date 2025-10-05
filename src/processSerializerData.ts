@@ -80,6 +80,10 @@ function iterateSerializerData(data: SerializerData, info: ProcessedInfo): Seria
 			data[2].map(([key, data]): [unknown, SerializerData] => [key, iterateSerializerData(data, info)]),
 			isPackable ? -1 : data[2].size() <= 256 ? 1 : 2,
 		];
+	} else if (kind === "guard_union") {
+		info.flags |= IterationFlags.SizeUnknown;
+
+		data = [kind, data[1].map((v) => [iterateSerializerData(v[0], info), v[1]] as const)];
 	} else if (kind === "map") {
 		info.flags |= IterationFlags.SizeUnknown;
 

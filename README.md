@@ -45,6 +45,9 @@ export interface Data {
 	unionOfStrings: "a" | "b" | "c" | "d" | "e" | "a very large string that will not exist in the serialized output!";
 	unionOfPrimitives: 1 | 2 | "a" | "b" | true | undefined;
 
+	// A complex union supports disambiguating arbitrary types using Flamework's type guard generation
+	complexUnion: string | number | { a: string } | { b: number } | Vector3;
+
 	tuple: [string, number, boolean];
 	tupleWithRest: [string, number, boolean, ...string[]];
 
@@ -118,6 +121,8 @@ const testData: Data = {
 	union: { type: "string", value: "hey, I am a string!" },
 	unionOfStrings: "a very large string that will not exist in the serialized output!",
 	unionOfPrimitives: true,
+
+	complexUnion: { b: 15 },
 
 	tuple: ["tuple!", 15, true],
 	tupleWithRest: ["tuple!!", 25, false, "various", "strings", "go", "here !"],
