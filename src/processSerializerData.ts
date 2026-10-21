@@ -114,7 +114,8 @@ function iterateSerializerData(data: SerializerData, info: ProcessedInfo): Seria
 		// we add the existing value of `data[3]` (which is 1 if undefined is in the union) to `data[1]`
 		// to determine the final required size.
 		// A size of -1 means this isn't a union.
-		data = [kind, data[1], data[2] === -1 ? 0 : data[2] + data[1].size() <= 256 ? 1 : 2];
+		// The fourth element records whether `undefined` is in the union: the one value outside `data[1]` that is accepted.
+		data = [kind, data[1], data[2] === -1 ? 0 : data[2] + data[1].size() <= 256 ? 1 : 2, data[2] === 1];
 	} else if (kind === "packed") {
 		info.flags |= IterationFlags.Packed;
 

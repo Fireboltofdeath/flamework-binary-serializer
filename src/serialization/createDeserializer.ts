@@ -71,7 +71,9 @@ export function createDeserializer<T>(info: ProcessedSerializerData) {
 		} else if (kind === "array") {
 			const deserializer = meta[1];
 			const length = buffer.readu32(buf, currentOffset);
-			const array = new Array<defined>(length);
+			// The length comes from the buffer, so preallocating all of it would let a 4-byte buffer allocate a gigabyte.
+			// The preallocation is only a capacity hint (`push` grows the array), so capping it changes no result.
+			const array = new Array<defined>(math.min(length, buffer.len(buf)));
 			offset += 4;
 
 			for (const i of $range(1, length)) {
@@ -89,7 +91,7 @@ export function createDeserializer<T>(info: ProcessedSerializerData) {
 				restLength = buffer.readu32(buf, currentOffset);
 			}
 
-			const tuple = new Array<defined>(elements.size() + restLength);
+			const tuple = new Array<defined>(elements.size() + math.min(restLength, buffer.len(buf)));
 
 			for (const element of elements) {
 				tuple.push(deserialize(element) as defined);
@@ -110,7 +112,12 @@ export function createDeserializer<T>(info: ProcessedSerializerData) {
 			offset += 4;
 
 			for (const i of $range(1, length)) {
-				map.set(deserialize(keyDeserializer), deserialize(valueDeserializer));
+				const key = deserialize(keyDeserializer);
+				const value = deserialize(valueDeserializer);
+
+				// Roblox sends an Instance that the receiver cannot see, such as a player who has left, as nil, so such a key
+				// arrives as undefined. Drop that entry instead of failing the whole value.
+				if (key !== undefined) map.set(key, value);
 			}
 
 			return map;
@@ -121,7 +128,8 @@ export function createDeserializer<T>(info: ProcessedSerializerData) {
 			offset += 4;
 
 			for (const i of $range(1, length)) {
-				set.add(deserialize(valueDeserializer));
+				const value = deserialize(valueDeserializer);
+				if (value !== undefined) set.add(value);
 			}
 
 			return set;
@@ -161,12 +169,14 @@ export function createDeserializer<T>(info: ProcessedSerializerData) {
 		} else if (kind === "literal") {
 			const literals = meta[1];
 			const byteSize = meta[2];
-			if (byteSize === 1) {
-				offset += 1;
-				return literals[buffer.readu8(buf, currentOffset)];
-			} else if (byteSize === 2) {
-				offset += 2;
-				return literals[buffer.readu16(buf, currentOffset)];
+			if (byteSize === 1 || byteSize === 2) {
+				offset += byteSize;
+				const index = byteSize === 1 ? buffer.readu8(buf, currentOffset) : buffer.readu16(buf, currentOffset);
+				const literal = literals[index];
+
+				// Only a union that includes `undefined` encodes a missing value; any other index past it is malformed.
+				if (literal === undefined && meta[3] !== true) error(`literal index ${index} is out of range`);
+				return literal;
 			} else if (byteSize === -1) {
 				bitIndex++;
 				return bits[bitIndex - 1] ? literals[0] : literals[1];

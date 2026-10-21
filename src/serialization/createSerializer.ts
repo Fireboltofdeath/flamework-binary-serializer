@@ -197,6 +197,13 @@ export function createSerializer<T>(info: ProcessedSerializerData) {
 			// This is fine, though, as -1 will serialize as the max integer which will be undefined on unions that do not exceed the size limit.
 			const literals = meta[1];
 			const byteSize = meta[2];
+
+			// Any other value would be written as an index past the union and read back as undefined, or as the second
+			// member of a packed two-member union, without an error.
+			if (!literals.includes(value as defined) && !(value === undefined && meta[3] === true)) {
+				error(`${value} is not one of the literals ${literals.map((literal) => tostring(literal)).join(", ")}`);
+			}
+
 			if (byteSize === 1) {
 				const index = literals.indexOf(value as defined);
 				allocate(1);
@@ -211,7 +218,9 @@ export function createSerializer<T>(info: ProcessedSerializerData) {
 				bits.push(value === literals[0]);
 			}
 		} else if (kind === "blob") {
-			// Value will always be defined because if it isn't, it will be wrapped in `optional`
+			// An optional blob is wrapped in `optional`, so `undefined` here is a required value that is missing. Pushing it
+			// would add nothing, and every later blob would be read into the field before it.
+			if (value === undefined) error("a required Instance or unknown value is undefined");
 			blobs.push(value!);
 		} else if (kind === "packed") {
 			const innerType = meta[1];

@@ -144,7 +144,7 @@ export type SerializerData =
 	| ["map", SerializerData, SerializerData]
 	| ["set", SerializerData]
 	| ["optional", SerializerData]
-	| ["literal", defined[], number]
+	| ["literal", defined[], number, boolean?]
 	| ["blob"]
 	| ["enum", string]
 	| { [k in keyof DataTypes]: [k] }[keyof DataTypes];
